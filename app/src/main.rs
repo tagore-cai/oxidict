@@ -48,46 +48,6 @@ fn run_cli_translate(text: &str) {
     }
 }
 
-/// 注册 Ctrl+C / SIGTERM 时的锁文件清理（尽力而为，进程被 SIGKILL 时会留下脏锁，
-/// 但下次启动前会检测到并自动清理）。
-fn ctrlc_handler_cleanup(lock_path: &std::path::Path) {
-    let path = lock_path.to_path_buf();
-    // 检查是否为脏锁：如果文件存在但对应进程已死，删除后重新创建。
-    if let Ok(content) = std::fs::read_to_string(&path) {
-        if let Ok(pid) = content.trim().parse::<u32>() {
-            // 写入了 PID，检查该进程是否还活着。
-            if !proc_exists(pid) {
-                let _ = std::fs::remove_file(&path);
-                if let Ok(f) = std::fs::OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(&path)
-                {
-                    std::mem::forget(f);
-                }
-            }
-        } else {
-            // 空文件（无 PID），是本次刚创建的，写上 PID。
-            let _ = std::fs::write(&path, std::process::id().to_string());
-        }
-    } else {
-        let _ = std::fs::write(&path, std::process::id().to_string());
-    }
-    let _ = std::fs::write(&path, std::process::id().to_string());
-}
-
-/// 检查 Unix 进程是否存在（kill -0）。
-fn proc_exists(pid: u32) -> bool {
-    // 如果是自己则存在。
-    if pid == std::process::id() {
-        return true;
-    }
-    // kill -0 不实际发信号，只检查进程是否存在。
-    unsafe {
-        libc::kill(pid as i32, 0) == 0
-    }
-}
-
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
 
@@ -98,28 +58,53 @@ fn main() {
         return;
     }
 
-    // 0.5 单实例保护：锁文件已存在则退出。
+    // 0.5 单实例保护：锁文件 + PID 检测（脏锁自动清理）。
     let lock_path = dirs::runtime_dir()
         .or_else(dirs::cache_dir)
         .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
         .join("saladict-app.lock");
-    if let Ok(_lock) = std::fs::OpenOptions::new()
+    let lock_created = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(&lock_path)
-    {
-        // 持有文件句柄直到进程退出，退出时由 OS 自动释放。
-        // 我们故意泄漏这个 File 以防止 OS 提前关闭它。
-        std::mem::forget(_lock);
-    } else {
-        eprintln!("检测到另一个 saladict 实例正在运行，退出。");
-        std::process::exit(0);
+        .open(&lock_path);
+    match lock_created {
+        Ok(_) => {
+            // 成功创建，写入 PID 供后续脏锁检测。
+            let _ = std::fs::write(&lock_path, std::process::id().to_string());
+        }
+        Err(_) => {
+            // 文件已存在，检查是否为脏锁（PID 对应进程已死）。
+            let stale = std::fs::read_to_string(&lock_path)
+                .ok()
+                .and_then(|s| s.trim().parse::<u32>().ok())
+                .map(|pid| pid != std::process::id() && unsafe { libc::kill(pid as i32, 0) != 0 })
+                .unwrap_or(true); // 读不到或解析失败视为脏锁
+
+            if stale {
+                let _ = std::fs::remove_file(&lock_path);
+                if std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&lock_path)
+                    .is_ok()
+                {
+                    let _ = std::fs::write(&lock_path, std::process::id().to_string());
+                } else {
+                    eprintln!("无法创建锁文件，退出。");
+                    std::process::exit(0);
+                }
+            } else {
+                eprintln!("检测到另一个 saladict 实例正在运行，退出。");
+                std::process::exit(0);
+            }
+        }
     }
-    // 退出时清理锁文件。
-    ctrlc_handler_cleanup(&lock_path);
 
     // 1. 配置：沿用老版本 config.json，老用户配置直接迁移。
     let store = ConfigStore::init().expect("初始化配置失败");
+
+    // 1.2 语言：按 app_language 初始化 Fluent 本地化。
+    saladict_core::i18n::init_from_config();
     log::info!("配置目录: {}", store.app_dir().display());
 
     // 1.5 历史库：与老版本同一个 history.db。

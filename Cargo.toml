@@ -109,6 +109,9 @@ lingua = { version = "1.6.2", default-features = false, features = [
     "ukrainian",
 ] }
 
+fluent-templates = "0.13"
+unic-langid = "0.9"
+
 # ---- plugin runtime ----
 rquickjs = "0.8"
 zip = { version = "2.2.0", default-features = false, features = ["deflate"] }

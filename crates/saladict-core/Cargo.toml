@@ -6,6 +6,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+fluent-templates.workspace = true
+unic-langid.workspace = true
 walkdir.workspace = true
 zip.workspace = true
 serde.workspace = true

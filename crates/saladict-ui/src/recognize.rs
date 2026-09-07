@@ -18,6 +18,7 @@ use gpui_kit::{
     StatefulInteractiveElement, TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions,
 };
 use saladict_core::config::{config, keys};
+use saladict_core::i18n::{t, t_args};
 use saladict_core::{Language, RecognizeRequest};
 use saladict_services::spawn_recognize;
 
@@ -49,7 +50,7 @@ impl RecognizeWindow {
         let image = match &self.image {
             Some(img) => img.clone(),
             None => {
-                self.error = Some("没有可识别的图片".to_string());
+                self.error = Some(t("recognize-no-image-error"));
                 cx.notify();
                 return;
             }
@@ -57,7 +58,7 @@ impl RecognizeWindow {
         let instance = match self.instances.first().cloned() {
             Some(i) => i,
             None => {
-                self.error = Some("未配置识别服务".to_string());
+                self.error = Some(t("recognize-no-service"));
                 cx.notify();
                 return;
             }
@@ -87,7 +88,8 @@ impl RecognizeWindow {
                         this.error = Some(e.to_string());
                     }
                     Err(e) => {
-                        this.error = Some(format!("任务被取消: {e}"));
+                        let msg = e.to_string();
+                        this.error = Some(t_args("task-cancelled", &[("error", &msg)]));
                     }
                 }
                 cx.notify();
@@ -112,18 +114,24 @@ impl RecognizeWindow {
     fn render_image(&self, cx: &Context<Self>) -> AnyElement {
         let theme = cx.theme();
         match &self.image {
-            Some(bytes) => v_flex()
-                .size_full()
-                .items_center()
-                .justify_center()
-                .rounded_md()
-                .border_1()
-                .border_color(theme.colors.border)
-                .bg(theme.colors.muted)
-                .text_color(theme.colors.muted_foreground)
-                .text_size(px(12.))
-                .child(SharedString::from(format!("图片 {} 字节", bytes.len())))
-                .into_any_element(),
+            Some(bytes) => {
+                let bytes_label = bytes.len().to_string();
+                v_flex()
+                    .size_full()
+                    .items_center()
+                    .justify_center()
+                    .rounded_md()
+                    .border_1()
+                    .border_color(theme.colors.border)
+                    .bg(theme.colors.muted)
+                    .text_color(theme.colors.muted_foreground)
+                    .text_size(px(12.))
+                    .child(SharedString::from(t_args(
+                        "recognize-image-bytes",
+                        &[("bytes", &bytes_label)],
+                    )))
+                    .into_any_element()
+            }
             None => v_flex()
                 .size_full()
                 .items_center()
@@ -133,7 +141,7 @@ impl RecognizeWindow {
                 .border_color(theme.colors.border)
                 .text_color(theme.colors.muted_foreground)
                 .text_size(px(12.))
-                .child("暂无图片")
+                .child(SharedString::from(t("recognize-no-image")))
                 .into_any_element(),
         }
     }
@@ -161,7 +169,7 @@ impl Render for RecognizeWindow {
                         div()
                             .text_size(px(13.))
                             .font_weight(FontWeight::MEDIUM)
-                            .child("沙拉翻译 · 识别"),
+                            .child(SharedString::from(t("recognize-window-title"))),
                     )
                     .child(
                         Button::new("close")
@@ -206,7 +214,7 @@ impl Render for RecognizeWindow {
                         Button::new("recognize")
                             .primary()
                             .small()
-                            .label("开始识别")
+                            .label(SharedString::from(t("recognize-action")))
                             .icon(IconName::Search)
                             .disabled(self.recognizing || self.image.is_none())
                             .on_click(cx.listener(Self::start_recognize)),
@@ -215,7 +223,7 @@ impl Render for RecognizeWindow {
                         Button::new("copy")
                             .ghost()
                             .small()
-                            .label("复制结果")
+                            .label(SharedString::from(t("recognize-copy")))
                             .icon(IconName::Copy)
                             .disabled(self.text.is_empty())
                             .on_click(cx.listener(Self::copy_result)),
@@ -224,7 +232,7 @@ impl Render for RecognizeWindow {
                         Button::new("translate")
                             .secondary()
                             .small()
-                            .label("翻译")
+                            .label(SharedString::from(t("recognize-to-translate")))
                             .icon(IconName::BookOpen)
                             .disabled(self.text.is_empty())
                             .on_click(cx.listener(Self::send_to_translate)),
@@ -249,7 +257,7 @@ pub fn open_recognize_with_image(cx: &mut App, image: Vec<u8>) {
             },
         })),
         titlebar: Some(TitlebarOptions {
-            title: Some("沙拉翻译 · 识别".into()),
+            title: Some(SharedString::from(t("recognize-window-title"))),
             appears_transparent: true,
             ..Default::default()
         }),

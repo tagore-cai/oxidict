@@ -9,6 +9,8 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
+use saladict_core::i18n::{t, t_args};
+
 use tokio::sync::mpsc::UnboundedSender;
 use tray_icon::menu::{
     CheckMenuItem, CheckMenuItemBuilder, Menu, MenuEvent, MenuId, MenuItemBuilder,
@@ -46,38 +48,38 @@ pub fn install(sender: UnboundedSender<TrayCommand>) -> anyhow::Result<()> {
     let icon = build_icon()?;
 
     let selection = MenuItemBuilder::new()
-        .text("划词翻译")
+        .text(t("tray-selection-translate"))
         .id(MenuId::new("selection_translate"))
         .enabled(true)
         .build();
     let input = MenuItemBuilder::new()
-        .text("输入翻译")
+        .text(t("tray-input-translate"))
         .id(MenuId::new("input_translate"))
         .enabled(true)
         .build();
     let ocr = MenuItemBuilder::new()
-        .text("截图 OCR")
+        .text(t("tray-ocr-recognize"))
         .id(MenuId::new("ocr_recognize"))
         .enabled(true)
         .build();
     let ocr_translate = MenuItemBuilder::new()
-        .text("截图翻译")
+        .text(t("tray-ocr-translate"))
         .id(MenuId::new("ocr_translate"))
         .enabled(true)
         .build();
     let clipboard = CheckMenuItemBuilder::new()
-        .text("监听剪切板")
+        .text(t("tray-clipboard-monitor"))
         .id(MenuId::new("toggle_clipboard"))
         .checked(false)
         .enabled(true)
         .build();
     let settings = MenuItemBuilder::new()
-        .text("偏好设置")
+        .text(t("tray-settings"))
         .id(MenuId::new("open_settings"))
         .enabled(true)
         .build();
     let quit = MenuItemBuilder::new()
-        .text("退出")
+        .text(t("tray-quit"))
         .id(MenuId::new("quit"))
         .enabled(true)
         .build();
@@ -92,14 +94,14 @@ pub fn install(sender: UnboundedSender<TrayCommand>) -> anyhow::Result<()> {
         &settings,
         &quit,
     ])
-    .map_err(|e| anyhow::anyhow!("菜单组装失败: {e}"))?;
+    .map_err(|e| anyhow::anyhow!(t_args("tray-error-menu-build", &[("err", &e.to_string())])))?;
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
-        .with_tooltip("沙拉翻译")
+        .with_tooltip(t("app-name"))
         .with_icon(icon)
         .build()
-        .map_err(|e| anyhow::anyhow!("托盘图标创建失败: {e}"))?;
+        .map_err(|e| anyhow::anyhow!(t_args("tray-error-icon-build", &[("err", &e.to_string())])))?;
     // 图标常驻进程生命周期，drop 会导致托盘消失。
     let _tray: &'static TrayIcon = Box::leak(Box::new(tray));
 
@@ -141,7 +143,7 @@ pub fn install(sender: UnboundedSender<TrayCommand>) -> anyhow::Result<()> {
 /// 切换剪切板监听（由 `ToggleClipboardMonitor` 命令驱动），并同步菜单勾选状态。
 pub fn toggle_clipboard_monitor() {
     let Some(atomic) = TRAY_STATE.get() else {
-        log::warn!("托盘尚未初始化，无法切换剪切板监听");
+        log::warn!("{}", t("tray-warn-not-init"));
         return;
     };
     let ptr = atomic.load(Ordering::Relaxed);
@@ -150,14 +152,17 @@ pub fn toggle_clipboard_monitor() {
     if state.monitor.is_some() {
         state.monitor.take().unwrap().stop();
         state.clipboard_item.set_checked(false);
-        log::info!("剪切板监听已关闭");
+        log::info!("{}", t("tray-clipboard-off"));
     } else {
         let handle = saladict_platform::clipboard::start_monitor(Arc::new(|text| {
-            log::info!("剪切板捕获: {} 字符", text.chars().count());
+            log::info!(
+                "{}",
+                t_args("tray-clipboard-captured", &[("count", &text.chars().count().to_string())])
+            );
         }));
         state.monitor = Some(handle);
         state.clipboard_item.set_checked(true);
-        log::info!("剪切板监听已开启");
+        log::info!("{}", t("tray-clipboard-on"));
     }
 }
 
@@ -169,5 +174,5 @@ fn build_icon() -> anyhow::Result<Icon> {
     for _ in 0..(SIZE * SIZE) {
         rgba.extend_from_slice(&[0x2E, 0xC2, 0x7E, 0xFF]);
     }
-    Icon::from_rgba(rgba, SIZE, SIZE).map_err(|e| anyhow::anyhow!("图标生成失败: {e}"))
+    Icon::from_rgba(rgba, SIZE, SIZE).map_err(|e| anyhow::anyhow!(t_args("tray-error-icon-gen", &[("err", &e.to_string())])))
 }

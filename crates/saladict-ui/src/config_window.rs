@@ -20,26 +20,28 @@ use gpui_kit::{
     Window, WindowBounds, WindowKind, WindowOptions,
 };
 use saladict_core::config::{config, keys, parse_instance};
+use saladict_core::i18n::{t, t_args};
 use saladict_core::schema::ConfigField;
-use saladict_core::ServiceKind;
+use saladict_core::{Error, ServiceKind};
 use saladict_services::services;
 
-/// 侧栏导航项：图标 + 标题。
-const NAV_ITEMS: [(IconName, &str); 6] = [
-    (IconName::Globe, "翻译服务"),
-    (IconName::Search, "识别服务"),
-    (IconName::Play, "语音合成"),
-    (IconName::BookOpen, "生词本"),
-    (IconName::Settings2, "快捷键"),
-    (IconName::Palette, "通用"),
+/// 侧栏导航项：图标 + 标题（标题存 i18n key，渲染时再 `t()` 翻译）。
+const NAV_ITEMS: [(IconName, &str); 7] = [
+    (IconName::Globe, "config-nav-translate"),
+    (IconName::Search, "config-nav-recognize"),
+    (IconName::Play, "config-nav-tts"),
+    (IconName::BookOpen, "config-nav-collection"),
+    (IconName::Settings2, "config-nav-hotkey"),
+    (IconName::Palette, "config-nav-general"),
+    (IconName::HardDrive, "config-nav-backup"),
 ];
 
-/// 服务分类的展示名，按导航顺序。
+/// 服务分类的展示名（i18n key），按导航顺序。
 const KIND_TABS: [(ServiceKind, &str); 4] = [
-    (ServiceKind::Translate, "翻译服务"),
-    (ServiceKind::Recognize, "识别服务"),
-    (ServiceKind::Tts, "语音合成"),
-    (ServiceKind::Collection, "生词本"),
+    (ServiceKind::Translate, "config-nav-translate"),
+    (ServiceKind::Recognize, "config-nav-recognize"),
+    (ServiceKind::Tts, "config-nav-tts"),
+    (ServiceKind::Collection, "config-nav-collection"),
 ];
 
 /// 前四项对应的服务分类。
@@ -72,31 +74,37 @@ pub struct ConfigWindow {
     add_state: Option<(ServiceKind, Entity<SelectState<Vec<&'static str>>>)>,
     form: Option<FormState>,
     scroll: ScrollHandle,
-    // 通用设置
-    hotkey_inputs: Vec<(&'static str, Entity<InputState>)>,
+    // 通用设置：(i18n key, 输入框实体, 配置键名)
+    hotkey_inputs: Vec<(&'static str, Entity<InputState>, &'static str)>,
     clipboard_monitor: bool,
     dark_mode: bool,
     proxy_enable: bool,
     proxy_host: Entity<InputState>,
     proxy_port: Entity<InputState>,
     saved_hint: bool,
+    // 备份
+    webdav_url: Entity<InputState>,
+    webdav_username: Entity<InputState>,
+    webdav_password: Entity<InputState>,
+    backup_status: Option<String>,
 }
 
 impl ConfigWindow {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let hotkey_inputs = [
-            ("划词翻译", "selection_translate"),
-            ("输入翻译", "input_translate"),
-            ("截图 OCR", "ocr_recognize"),
-            ("截图翻译", "ocr_translate"),
+            ("config-hotkey-selection", "selection_translate"),
+            ("config-hotkey-input", "input_translate"),
+            ("config-hotkey-ocr", "ocr_recognize"),
+            ("config-hotkey-ocr-translate", "ocr_translate"),
         ]
         .into_iter()
-        .map(|(label, name)| {
+        .map(|(i18n_key, name)| {
             let full = format!("{}{}", keys::HOTKEY_PREFIX, name);
             let value = config().get::<String>(&full).unwrap_or_default();
             (
-                label,
+                i18n_key,
                 cx.new(|cx| InputState::new(window, cx).default_value(value)),
+                name,
             )
         })
         .collect();
@@ -111,6 +119,28 @@ impl ConfigWindow {
         let proxy_port = cx.new(|cx| {
             InputState::new(window, cx)
                 .default_value(config().get_or(keys::PROXY_PORT, 1087).to_string())
+        });
+
+        let webdav_url = cx.new(|cx| {
+            InputState::new(window, cx).default_value(
+                config()
+                    .get::<String>(keys::WEBDAV_URL)
+                    .unwrap_or_default(),
+            )
+        });
+        let webdav_username = cx.new(|cx| {
+            InputState::new(window, cx).default_value(
+                config()
+                    .get::<String>(keys::WEBDAV_USERNAME)
+                    .unwrap_or_default(),
+            )
+        });
+        let webdav_password = cx.new(|cx| {
+            InputState::new(window, cx).default_value(
+                config()
+                    .get::<String>(keys::WEBDAV_PASSWORD)
+                    .unwrap_or_default(),
+            )
         });
 
         let mut this = Self {
@@ -128,6 +158,10 @@ impl ConfigWindow {
             proxy_host,
             proxy_port,
             saved_hint: false,
+            webdav_url,
+            webdav_username,
+            webdav_password,
+            backup_status: None,
         };
         this.refresh_add_state(window, cx);
         this
@@ -262,7 +296,7 @@ impl ConfigWindow {
                 .any(|f| f.key() == *key && matches!(f, ConfigField::Text { required: true, .. }));
             if required && value.is_empty() {
                 let label = field_label(&form.schema, key);
-                form.error = Some(format!("{} 不能为空", label));
+                form.error = Some(t_args("config-field-required", &[("field", label.as_str())]));
                 self.form = Some(form);
                 cx.notify();
                 return;
@@ -328,15 +362,8 @@ impl ConfigWindow {
 
     fn save_general(&mut self, _: &gpui_kit::ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
         let store = config();
-        for (label, ent) in &self.hotkey_inputs {
-            // hotkey_inputs 的名字是展示名，对应回配置键。
-            let key_name = match *label {
-                "划词翻译" => "selection_translate",
-                "输入翻译" => "input_translate",
-                "截图 OCR" => "ocr_recognize",
-                _ => "ocr_translate",
-            };
-            let full = format!("{}{}", keys::HOTKEY_PREFIX, key_name);
+        for (_key, ent, name) in &self.hotkey_inputs {
+            let full = format!("{}{}", keys::HOTKEY_PREFIX, name);
             let _ = store.set(&full, &ent.read(cx).value().to_string());
         }
         let _ = store.set(keys::CLIPBOARD_MONITOR, &self.clipboard_monitor);
@@ -397,12 +424,12 @@ fn schema_of(kind: ServiceKind, id: &str) -> Vec<ConfigField> {
 }
 
 /// 从 schema 里取字段显示名。
-fn field_label(schema: &[ConfigField], key: &str) -> &'static str {
+fn field_label(schema: &[ConfigField], key: &str) -> String {
     schema
         .iter()
         .find(|f| f.key() == key)
-        .map(|f| f.label())
-        .unwrap_or("字段")
+        .map(|f| f.label().to_string())
+        .unwrap_or_else(|| t("config-field-unknown"))
 }
 
 // ---------------------------------------------------------------------------
@@ -433,7 +460,7 @@ fn labeled_field(label: &str, state: &Entity<InputState>, secret: bool) -> gpui_
         .into_any_element()
 }
 
-fn field_label_div(label: &'static str, color: gpui_kit::Hsla) -> gpui_kit::AnyElement {
+fn field_label_div(label: &str, color: gpui_kit::Hsla) -> gpui_kit::AnyElement {
     div()
         .text_size(px(12.))
         .text_color(color)
@@ -465,6 +492,7 @@ impl Render for ConfigWindow {
         };
 
         // ── 侧栏 ──
+        let logo_char: String = t("app-name").chars().take(1).collect();
         let logo = h_flex()
             .gap_2()
             .items_center()
@@ -481,7 +509,7 @@ impl Render for ConfigWindow {
                         div()
                             .text_size(px(16.))
                             .text_color(cx.theme().colors.primary_foreground)
-                            .child("沙"),
+                            .child(SharedString::from(logo_char)),
                     ),
             )
             .child(
@@ -490,7 +518,7 @@ impl Render for ConfigWindow {
                         div()
                             .text_size(px(13.))
                             .font_weight(gpui_kit::FontWeight::MEDIUM)
-                            .child("沙拉翻译"),
+                            .child(SharedString::from(t("app-name"))),
                     )
                     .child(
                         div()
@@ -522,7 +550,7 @@ impl Render for ConfigWindow {
                         this.refresh_add_state(window, cx);
                     }))
                     .child(Icon::new(icon.clone()).small())
-                    .child(div().text_size(px(13.)).child(SharedString::from(*label)))
+                    .child(div().text_size(px(13.)).child(SharedString::from(t(label))))
             },
         ));
 
@@ -541,7 +569,7 @@ impl Render for ConfigWindow {
                 div()
                     .text_size(px(10.))
                     .text_color(muted_fg)
-                    .child("Rust + gpui-kit 重写版"),
+                    .child(SharedString::from(t("app-tagline"))),
             );
 
         // ── 内容区 ──
@@ -559,6 +587,8 @@ impl Render for ConfigWindow {
         let content: gpui_kit::AnyElement = match self.nav {
             0..=3 => self.render_service_page(cx),
             4 => self.render_hotkey_page(cx),
+            5 => self.render_general_page(cx),
+            6 => self.render_backup_page(window, cx),
             _ => self.render_general_page(cx),
         };
 
@@ -586,7 +616,7 @@ impl Render for ConfigWindow {
                                 div()
                                     .text_size(px(14.))
                                     .font_weight(gpui_kit::FontWeight::MEDIUM)
-                                    .child(SharedString::from(page_title)),
+                                    .child(SharedString::from(t(page_title))),
                             ),
                     )
                     .child(
@@ -618,15 +648,14 @@ impl ConfigWindow {
             div()
                 .text_size(px(12.))
                 .text_color(muted_fg)
-                .child(SharedString::from(format!(
-                    "{} · 已启用 {} 个实例",
-                    title,
-                    list.len()
+                .child(SharedString::from(t_args(
+                    "config-instances-count",
+                    &[("title", t(title).as_str()), ("count", &list.len().to_string())],
                 ))),
         );
 
         if list.is_empty() {
-            page = page.child(placeholder_text("尚未启用任何服务，从下方添加。"));
+            page = page.child(placeholder_text(t("config-no-instances").as_str()));
         }
         for (list_ix, key) in list.iter().enumerate() {
             let key = key.clone();
@@ -662,7 +691,7 @@ impl ConfigWindow {
                                     .ghost()
                                     .xsmall()
                                     .icon(IconName::ArrowUp)
-                                    .tooltip("上移")
+                                    .tooltip(t("config-move-up").as_str())
                                     .disabled(list_ix == 0)
                                     .on_click(cx.listener(move |this, _, _, cx| {
                                         this.move_instance(kind, list_ix, -1);
@@ -674,7 +703,7 @@ impl ConfigWindow {
                                     .ghost()
                                     .xsmall()
                                     .icon(IconName::ArrowDown)
-                                    .tooltip("下移")
+                                    .tooltip(t("config-move-down").as_str())
                                     .disabled(list_ix == list.len() - 1)
                                     .on_click(cx.listener(move |this, _, _, cx| {
                                         this.move_instance(kind, list_ix, 1);
@@ -686,7 +715,7 @@ impl ConfigWindow {
                                     .ghost()
                                     .xsmall()
                                     .icon(IconName::Delete)
-                                    .tooltip("移除")
+                                    .tooltip(t("config-remove").as_str())
                                     .on_click(cx.listener(move |this, _, _, cx| {
                                         this.remove_instance(kind, &key);
                                         cx.notify();
@@ -704,7 +733,7 @@ impl ConfigWindow {
                     .justify_between()
                     .items_center()
                     .py_2()
-                    .child(placeholder_text("添加新服务实例"))
+                    .child(placeholder_text(t("config-add-instance").as_str()))
                     .child(
                         h_flex()
                             .gap_2()
@@ -714,7 +743,7 @@ impl ConfigWindow {
                                 Button::new("add")
                                     .primary()
                                     .small()
-                                    .label("添加")
+                                    .label(t("config-add").as_str())
                                     .on_click(cx.listener(move |this, _, window, cx| {
                                         let Some((_, state)) = &this.add_state else { return };
                                         let Some(id) =
@@ -744,21 +773,28 @@ impl ConfigWindow {
                         .text_size(px(13.))
                         .text_color(fg)
                         .font_weight(gpui_kit::FontWeight::MEDIUM)
-                        .child(SharedString::from(format!("配置 {}", form.service_id))),
-                );
+                    .child(SharedString::from(t_args(
+                        "config-configure",
+                        &[("service", form.service_id.as_str())],
+                    ))),
+            );
 
-            form_card = form_card.child(labeled_field("实例名称", &form.instance_name, false));
+            form_card = form_card.child(labeled_field(
+                t("config-instance-name").as_str(),
+                &form.instance_name,
+                false,
+            ));
 
             for (key, ent, secret) in &form.text_fields {
                 let label = field_label(&form.schema, key);
-                form_card = form_card.child(labeled_field(label, ent, *secret));
+                form_card = form_card.child(labeled_field(&label, ent, *secret));
             }
             for (key, state, _) in &form.select_fields {
                 let label = field_label(&form.schema, key);
                 form_card = form_card.child(
                     v_flex()
                         .gap_1()
-                        .child(field_label_div(label, muted_fg))
+                        .child(field_label_div(&label, muted_fg))
                         .child(Select::new(state).small()),
                 );
             }
@@ -794,13 +830,13 @@ impl ConfigWindow {
                             div()
                                 .text_size(px(13.))
                                 .text_color(fg)
-                                .child(SharedString::from(label.to_string())),
+                                .child(SharedString::from(label)),
                         ),
                 );
             }
             for (key, ent, _) in &form.number_fields {
                 let label = field_label(&form.schema, key);
-                form_card = form_card.child(labeled_field(label, ent, false));
+                form_card = form_card.child(labeled_field(&label, ent, false));
             }
 
             if let Some(err) = &form.error {
@@ -820,7 +856,7 @@ impl ConfigWindow {
                         Button::new("cancel-form")
                             .ghost()
                             .small()
-                            .label("取消")
+                            .label(t("common-cancel").as_str())
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.form = None;
                                 cx.notify();
@@ -830,7 +866,7 @@ impl ConfigWindow {
                         Button::new("save-form")
                             .primary()
                             .small()
-                            .label("保存")
+                            .label(t("common-save").as_str())
                             .on_click(cx.listener(Self::save_form)),
                     ),
             );
@@ -852,10 +888,10 @@ impl ConfigWindow {
             div()
                 .text_size(px(12.))
                 .text_color(muted_fg)
-                .child("全局快捷键（如 Command+T / Ctrl+Alt+X，留空禁用；修改后需保存）"),
+                .child(SharedString::from(t("config-hotkey-hint"))),
         );
 
-        for (label, ent) in &self.hotkey_inputs {
+        for (label, ent, _name) in &self.hotkey_inputs {
             page = page.child(
                 h_flex()
                     .w_full()
@@ -868,7 +904,7 @@ impl ConfigWindow {
                         div()
                             .text_size(px(13.))
                             .text_color(fg)
-                            .child(SharedString::from((*label).to_string())),
+                            .child(SharedString::from(t(label))),
                     )
                     .child(Input::new(ent).w(px(200.)).small()),
             );
@@ -892,7 +928,7 @@ impl ConfigWindow {
                 .py_2()
                 .border_b_1()
                 .border_color(border)
-                .child(div().text_size(px(13.)).text_color(fg).child("监听剪切板"))
+                .child(div().text_size(px(13.)).text_color(fg).child(SharedString::from(t("config-clipboard-monitor"))))
                 .child(
                     Switch::new("clipboard-monitor")
                         .checked(self.clipboard_monitor)
@@ -914,7 +950,7 @@ impl ConfigWindow {
                     .py_2()
                     .border_b_1()
                     .border_color(border)
-                    .child(div().text_size(px(13.)).text_color(fg).child("深色模式"))
+                    .child(div().text_size(px(13.)).text_color(fg).child(SharedString::from(t("config-dark-mode"))))
                     .child(
                         Switch::new("dark-mode")
                             .checked(self.dark_mode)
@@ -949,7 +985,7 @@ impl ConfigWindow {
                 .py_2()
                 .border_b_1()
                 .border_color(border)
-                .child(div().text_size(px(13.)).text_color(fg).child("HTTP 代理"))
+                .child(div().text_size(px(13.)).text_color(fg).child(SharedString::from(t("config-proxy"))))
                 .child(
                     Switch::new("proxy-enable")
                         .checked(self.proxy_enable)
@@ -970,7 +1006,7 @@ impl ConfigWindow {
                         .py_2()
                         .border_b_1()
                         .border_color(border)
-                        .child(div().text_size(px(13.)).text_color(fg).child("代理主机"))
+                        .child(div().text_size(px(13.)).text_color(fg).child(SharedString::from(t("config-proxy-host"))))
                         .child(Input::new(&self.proxy_host).w(px(200.)).small()),
                 )
                 .child(
@@ -981,7 +1017,7 @@ impl ConfigWindow {
                         .py_2()
                         .border_b_1()
                         .border_color(border)
-                        .child(div().text_size(px(13.)).text_color(fg).child("代理端口"))
+                        .child(div().text_size(px(13.)).text_color(fg).child(SharedString::from(t("config-proxy-port"))))
                         .child(Input::new(&self.proxy_port).w(px(200.)).small()),
                 );
         }
@@ -990,8 +1026,8 @@ impl ConfigWindow {
             page = page.child(
                 div()
                     .text_size(px(12.))
-                    .text_color(cx.theme().colors.success)
-                    .child("已保存（部分设置重启后生效）"),
+                .text_color(cx.theme().colors.success)
+                .child(SharedString::from(t("config-saved-hint"))),
             );
         }
 
@@ -1000,12 +1036,208 @@ impl ConfigWindow {
                 Button::new("save-general")
                     .primary()
                     .small()
-                    .label("保存设置")
+                    .label(t("config-save-settings").as_str())
                     .on_click(cx.listener(Self::save_general)),
             ),
         );
 
         page.into_any_element()
+    }
+
+    fn render_backup_page(&mut self, window: &mut Window, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let (fg, muted_fg, border) = {
+            let t = cx.theme();
+            (t.colors.foreground, t.colors.muted_foreground, t.colors.border)
+        };
+
+        // 先保存 WebDAV 凭据到 config。
+        let url = self.webdav_url.read(cx).value().trim().to_string();
+        let username = self.webdav_username.read(cx).value().trim().to_string();
+        let password = self.webdav_password.read(cx).value().trim().to_string();
+
+        let mut page = v_flex().px_4().py_3().gap_2();
+
+        page = page.child(
+            div()
+                .text_size(px(12.))
+                .text_color(muted_fg)
+                .child("WebDAV 云端备份（填入服务器地址与凭据后可上传/恢复）"),
+        );
+
+        page = page.child(labeled_field("服务器地址", &self.webdav_url, false));
+        page = page.child(labeled_field("用户名", &self.webdav_username, false));
+        page = page.child(labeled_field("密码", &self.webdav_password, true));
+
+        if let Some(status) = &self.backup_status {
+            page = page.child(
+                div()
+                    .text_size(px(12.))
+                    .text_color(fg)
+                    .child(SharedString::from(status.clone())),
+            );
+        }
+
+        page = page.child(
+            h_flex()
+                .gap_2()
+                .child({
+                    let url = url.clone();
+                    let username = username.clone();
+                    let password = password.clone();
+                    Button::new("webdav-put")
+                        .primary()
+                        .small()
+                        .label("备份到云端")
+                        .disabled(url.is_empty() || username.is_empty())
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.do_webdav_backup(&url, &username, &password, window, cx);
+                        }))
+                })
+                .child({
+                    let url = url.clone();
+                    let username = username.clone();
+                    let password = password.clone();
+                    Button::new("webdav-get")
+                        .secondary()
+                        .small()
+                        .label("从云端恢复")
+                        .disabled(url.is_empty() || username.is_empty())
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.do_webdav_restore(&url, &username, &password, window, cx);
+                        }))
+                }),
+        );
+
+        // ── 本地导出/导入 ──
+        page = page.child(
+            div()
+                .text_size(px(12.))
+                .text_color(muted_fg)
+                .child("本地备份（保存为 zip 文件或从备份文件恢复）"),
+        );
+
+        page = page.child(
+            h_flex()
+                .gap_2()
+                .child(
+                    Button::new("local-export")
+                        .secondary()
+                        .small()
+                        .label("导出到文件")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.do_local_export(window, cx);
+                        })),
+                )
+                .child(
+                    Button::new("local-import")
+                        .secondary()
+                        .small()
+                        .label("从文件导入")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.do_local_import(window, cx);
+                        })),
+                ),
+        );
+
+        page.into_any_element()
+    }
+
+    /// 保存 WebDAV 凭据到 config 并执行云端备份。
+    fn do_webdav_backup(
+        &mut self,
+        url: &str,
+        username: &str,
+        password: &str,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let store = config();
+        let _ = store.set(keys::WEBDAV_URL, &url);
+        let _ = store.set(keys::WEBDAV_USERNAME, &username);
+        let _ = store.set(keys::WEBDAV_PASSWORD, &password);
+
+        let cfg = saladict_net::webdav::WebDavConfig {
+            url: url.to_string(),
+            username: username.to_string(),
+            password: password.to_string(),
+        };
+        let name = format!("saladict-backup-{}.zip", saladict_net::iso_utc_now().replace(':', ""));
+        let handle = saladict_core::runtime::spawn(async move {
+            saladict_net::webdav::put(&cfg, &name, saladict_core::backup::pack()?).await?;
+            Ok::<_, Error>(format!("已上传到云端: {name}"))
+        });
+        cx.spawn(async move |this, cx| {
+            let status = match handle.await {
+                Ok(Ok(msg)) => msg,
+                Ok(Err(e)) => format!("备份失败: {e}"),
+                Err(e) => format!("任务取消: {e}"),
+            };
+            let _ = this.update(cx, |this, cx| {
+                this.backup_status = Some(status);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// 从 WebDAV 下载并恢复备份。
+    fn do_webdav_restore(
+        &mut self,
+        url: &str,
+        username: &str,
+        password: &str,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let cfg = saladict_net::webdav::WebDavConfig {
+            url: url.to_string(),
+            username: username.to_string(),
+            password: password.to_string(),
+        };
+        // 用当前配置里最近一次备份名（简化：取列表最后一个）。
+        let handle = saladict_core::runtime::spawn(async move {
+            let files = saladict_net::webdav::list(&cfg).await?;
+            let name = files.last().ok_or_else(|| {
+                Error::Service("云端没有备份文件".into())
+            })?.clone();
+            let data = saladict_net::webdav::get(&cfg, &name).await?;
+            saladict_core::backup::unpack(&data)?;
+            Ok::<_, Error>(format!("已从云端恢复: {name}"))
+        });
+        cx.spawn(async move |this, cx| {
+            let status = match handle.await {
+                Ok(Ok(msg)) => msg,
+                Ok(Err(e)) => format!("恢复失败: {e}"),
+                Err(e) => format!("任务取消: {e}"),
+            };
+            let _ = this.update(cx, |this, cx| {
+                this.backup_status = Some(status);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// 导出到本地 zip 文件。
+    fn do_local_export(&mut self, _: &mut Window, cx: &mut Context<Self>) {
+        match saladict_core::backup::export_to_file(
+            config().app_dir().join("saladict-backup.zip").to_str().unwrap_or("/tmp/saladict-backup.zip"),
+        ) {
+            Ok(()) => self.backup_status = Some("已导出到配置目录 saladict-backup.zip".into()),
+            Err(e) => self.backup_status = Some(format!("导出失败: {e}")),
+        }
+        cx.notify();
+    }
+
+    /// 从本地 zip 文件导入。
+    fn do_local_import(&mut self, _: &mut Window, cx: &mut Context<Self>) {
+        match saladict_core::backup::import_from_file(
+            config().app_dir().join("saladict-backup.zip").to_str().unwrap_or("/tmp/saladict-backup.zip"),
+        ) {
+            Ok(()) => self.backup_status = Some("已从配置目录 saladict-backup.zip 恢复".into()),
+            Err(e) => self.backup_status = Some(format!("导入失败: {e}")),
+        }
+        cx.notify();
     }
 }
 
@@ -1017,7 +1249,7 @@ pub fn open_config(cx: &mut App) {
             size: Size { width: px(820.0), height: px(560.0) },
         })),
         titlebar: Some(TitlebarOptions {
-            title: Some("偏好设置".into()),
+            title: Some(t("config-title").into()),
             appears_transparent: true,
             ..Default::default()
         }),

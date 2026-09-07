@@ -4,6 +4,7 @@
 //! 这一层不依赖 GPUI，也不依赖 Tauri，可独立测试。
 
 pub mod backup;
+pub mod i18n;
 pub mod config;
 pub mod error;
 pub mod history;

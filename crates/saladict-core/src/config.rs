@@ -38,10 +38,51 @@ pub mod keys {
     pub const PROXY_ENABLE: &str = "proxy_enable";
     pub const PROXY_HOST: &str = "proxy_host";
     pub const PROXY_PORT: &str = "proxy_port";
+    pub const PROXY_USERNAME: &str = "proxy_username";
+    pub const PROXY_PASSWORD: &str = "proxy_password";
+    pub const NO_PROXY: &str = "no_proxy";
     pub const SERVER_PORT: &str = "server_port";
     pub const UI_LANGUAGE: &str = "ui_language";
     pub const APP_THEME: &str = "app_theme";
+    pub const APP_FONT: &str = "app_font";
+    pub const APP_FALLBACK_FONT: &str = "app_fallback_font";
+    pub const APP_FONT_SIZE: &str = "app_font_size";
+    pub const APP_LANGUAGE: &str = "app_language";
     pub const AUTOSTART: &str = "autostart";
+    pub const DEV_MODE: &str = "dev_mode";
+
+    // 翻译窗口行为
+    pub const DYNAMIC_TRANSLATE: &str = "dynamic_translate";
+    pub const INCREMENTAL_TRANSLATE: &str = "incremental_translate";
+    pub const TRANSLATE_DELETE_NEWLINE: &str = "translate_delete_newline";
+    pub const TRANSLATE_FONT_SIZE: &str = "translate_font_size";
+    pub const TRANSLATE_REVERT_ENTER: &str = "translate_revert_enter";
+    pub const TRANSLATE_SECOND_LANGUAGE: &str = "translate_second_language";
+    pub const TRANSLATE_HIDE_WINDOW: &str = "translate_hide_window";
+    pub const TRANSLATE_REMEMBER_WINDOW_SIZE: &str = "translate_remember_window_size";
+    pub const TRANSLATE_WINDOW_POSITION: &str = "translate_window_position";
+    pub const HIDE_SOURCE: &str = "hide_source";
+    pub const HIDE_LANGUAGE: &str = "hide_language";
+    pub const HISTORY_DISABLE: &str = "history_disable";
+
+    // OCR 窗口行为
+    pub const RECOGNIZE_AUTO_COPY: &str = "recognize_auto_copy";
+    pub const RECOGNIZE_CLOSE_ON_BLUR: &str = "recognize_close_on_blur";
+    pub const RECOGNIZE_DELETE_NEWLINE: &str = "recognize_delete_newline";
+    pub const RECOGNIZE_HIDE_WINDOW: &str = "recognize_hide_window";
+    pub const RECOGNIZE_LANGUAGE: &str = "recognize_language";
+
+    // 备份
+    pub const BACKUP_TYPE: &str = "backup_type";
+    pub const WEBDAV_URL: &str = "webdav_url";
+    pub const WEBDAV_USERNAME: &str = "webdav_username";
+    pub const WEBDAV_PASSWORD: &str = "webdav_password";
+    pub const ALIYUN_ACCESS_TOKEN: &str = "aliyun_access_token";
+    pub const ALIYUN_REFRESH_TOKEN: &str = "aliyun_refresh_token";
+
+    // 托盘
+    pub const TRAY_CLICK_EVENT: &str = "tray_click_event";
+    pub const IGNORE_UPDATER_VERSION: &str = "ignore_updater_version";
 
     /// 快捷键配置前缀，实际键形如 `hotkey_selection_translate`。
     pub const HOTKEY_PREFIX: &str = "hotkey_";
@@ -135,6 +176,47 @@ impl ConfigStore {
             ("hotkey_input_translate", json!("")),
             ("hotkey_ocr_recognize", json!("")),
             ("hotkey_ocr_translate", json!("")),
+            // 翻译窗口行为
+            (keys::DYNAMIC_TRANSLATE, json!(false)),
+            (keys::INCREMENTAL_TRANSLATE, json!(false)),
+            (keys::TRANSLATE_DELETE_NEWLINE, json!(0)),
+            (keys::TRANSLATE_FONT_SIZE, json!(16)),
+            (keys::TRANSLATE_REVERT_ENTER, json!(true)),
+            (keys::TRANSLATE_SECOND_LANGUAGE, json!("zh_cn")),
+            (keys::TRANSLATE_HIDE_WINDOW, json!(false)),
+            (keys::TRANSLATE_REMEMBER_WINDOW_SIZE, json!(false)),
+            (keys::TRANSLATE_WINDOW_POSITION, json!("")),
+            (keys::TRANSLATE_AUTO_COPY, json!(4)),
+            (keys::TRANSLATE_DETECT_ENGINE, json!("local")),
+            (keys::HIDE_SOURCE, json!(false)),
+            (keys::HIDE_LANGUAGE, json!(false)),
+            (keys::HISTORY_DISABLE, json!(false)),
+            // OCR 窗口行为
+            (keys::RECOGNIZE_AUTO_COPY, json!(4)),
+            (keys::RECOGNIZE_CLOSE_ON_BLUR, json!(false)),
+            (keys::RECOGNIZE_DELETE_NEWLINE, json!(false)),
+            (keys::RECOGNIZE_HIDE_WINDOW, json!(false)),
+            (keys::RECOGNIZE_LANGUAGE, json!("auto")),
+            // 代理详情
+            (keys::PROXY_USERNAME, json!("")),
+            (keys::PROXY_PASSWORD, json!("")),
+            (keys::NO_PROXY, json!("")),
+            // 字体
+            (keys::APP_FONT, json!("default")),
+            (keys::APP_FALLBACK_FONT, json!("default")),
+            (keys::APP_FONT_SIZE, json!(16)),
+            (keys::APP_LANGUAGE, json!("zh_cn")),
+            // 备份
+            (keys::BACKUP_TYPE, json!("webdav")),
+            (keys::WEBDAV_URL, json!("")),
+            (keys::WEBDAV_USERNAME, json!("")),
+            (keys::WEBDAV_PASSWORD, json!("")),
+            (keys::ALIYUN_ACCESS_TOKEN, json!("")),
+            (keys::ALIYUN_REFRESH_TOKEN, json!("")),
+            // 托盘与其他
+            (keys::TRAY_CLICK_EVENT, json!("config")),
+            (keys::IGNORE_UPDATER_VERSION, json!("")),
+            (keys::DEV_MODE, json!(false)),
         ];
         for (k, v) in defaults {
             data.entry(k.to_string()).or_insert(v);

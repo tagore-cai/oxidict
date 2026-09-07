@@ -5,6 +5,7 @@
 
 use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
+use saladict_core::i18n::{t, t_args};
 use gpui_kit::component::button::Button;
 use gpui_kit::component::button::ButtonVariants as _;
 use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
@@ -61,7 +62,7 @@ impl UpdaterWindow {
                             .unwrap_or("")
                             .to_string();
                         if tag.is_empty() {
-                            this.error = Some("未获取到版本信息".to_string());
+                            this.error = Some(t("updater-error-no-version").to_string());
                         } else {
                             this.latest = Some(tag);
                             this.body = Some(body);
@@ -93,7 +94,10 @@ impl UpdaterWindow {
                     div()
                         .text_color(theme.colors.foreground)
                         .text_size(px(13.))
-                        .child(SharedString::from(format!("最新版本：{latest}"))),
+                        .child(SharedString::from(t_args(
+                        "updater-latest-version",
+                        &[("version", latest.as_str())],
+                    ))),
                 )
                 .child(
                     div()
@@ -108,7 +112,7 @@ impl UpdaterWindow {
         div()
             .text_color(theme.colors.muted_foreground)
             .text_size(px(12.))
-            .child("点击「检查更新」查看是否有新版本")
+            .child(SharedString::from(t("updater-hint")))
             .into_any_element()
     }
 }
@@ -135,10 +139,11 @@ impl Render for UpdaterWindow {
                         div()
                             .text_size(px(13.))
                             .font_weight(FontWeight::MEDIUM)
-                            .child(SharedString::from(format!(
-                                "沙拉翻译 · v{}",
-                                self.current_version
-                            ))),
+                    .child(SharedString::from(format!(
+                        "{} · v{}",
+                        t("app-name"),
+                        self.current_version
+                    ))),
                     )
                     .child(
                         Button::new("close")
@@ -165,15 +170,15 @@ impl Render for UpdaterWindow {
                                 Button::new("check")
                                     .primary()
                                     .small()
-                                    .label("检查更新")
-                                    .disabled(self.checking)
+                                .label(t("updater-title"))
+                                .disabled(self.checking)
                                     .on_click(cx.listener(Self::check_update)),
                             )
                             .child(if self.checking {
                                 div()
                                     .text_size(px(12.))
                                     .text_color(theme.colors.muted_foreground)
-                                    .child("检查中…")
+                                    .child(SharedString::from(t("updater-checking")))
                                     .into_any_element()
                             } else {
                                 div().into_any_element()
@@ -196,7 +201,7 @@ impl Render for UpdaterWindow {
                                 Button::new("download")
                                     .ghost()
                                     .small()
-                                    .label("前往下载")
+                                    .label(t("updater-download"))
                                     .icon(IconName::ExternalLink)
                                     .on_click(cx.listener(|_, _, _, cx| {
                                         cx.open_url(
@@ -226,7 +231,7 @@ pub fn open_updater(cx: &mut App) {
             },
         })),
         titlebar: Some(TitlebarOptions {
-            title: Some("沙拉翻译 · 更新".into()),
+            title: Some(t("updater-window-title").into()),
             appears_transparent: true,
             ..Default::default()
         }),

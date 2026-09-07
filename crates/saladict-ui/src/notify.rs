@@ -5,6 +5,7 @@
 
 use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
+use saladict_core::i18n::t;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::button::ButtonVariants as _;
 use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
@@ -45,7 +46,7 @@ impl Render for NotifyWindow {
                         div()
                             .text_size(px(13.))
                             .font_weight(FontWeight::MEDIUM)
-                            .child("沙拉翻译"),
+                            .child(SharedString::from(t("app-name"))),
                     )
                     .child(
                         Button::new("close")
@@ -95,7 +96,7 @@ pub fn open_notify(cx: &mut App, message: String) {
             let view = cx.new(|_cx| NotifyWindow::new(message.clone()));
             cx.new(|cx| Root::new(view, window, cx))
         })
-        .expect("打开通知窗口失败");
+        .expect(t("notify-error-open").as_str());
 
     cx.spawn(async move |cx: &mut AsyncApp| {
         cx.background_executor()

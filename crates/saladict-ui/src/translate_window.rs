@@ -20,6 +20,7 @@ use gpui_kit::{
 };
 use std::sync::Arc;
 use saladict_core::config::config;
+use saladict_core::i18n::{t, t_args};
 use saladict_core::{Language, TranslateRequest, TranslateResult};
 use saladict_services::{instance_display_name, spawn_translate};
 
@@ -165,7 +166,10 @@ impl TranslateWindow {
                 let state = match task.await {
                     Ok(Ok(result)) => CardState::Done(result),
                     Ok(Err(e)) => CardState::Failed(e.to_string()),
-                    Err(e) => CardState::Failed(format!("任务被取消: {e}")),
+                    Err(e) => {
+                        let msg = e.to_string();
+                        CardState::Failed(t_args("task-cancelled", &[("error", &msg)]))
+                    }
                 };
                 let _ = this.update(cx, |this, cx| {
                     if let Some(card) = this.cards.get_mut(idx) {
@@ -225,12 +229,12 @@ impl TranslateWindow {
         let body: AnyElement = match &card.state {
             CardState::Idle => div()
                 .text_color(theme.colors.muted_foreground)
-                .child("输入文本后点击翻译")
+                .child(SharedString::from(t("translate-idle-hint")))
                 .into_any_element(),
             CardState::Loading => h_flex()
                 .gap_2()
                 .child(Spinner::new().small())
-                .child(div().text_color(theme.colors.muted_foreground).child("翻译中…"))
+                .child(div().text_color(theme.colors.muted_foreground).child(SharedString::from(t("app-translating"))))
                 .into_any_element(),
             CardState::Done(result) => div()
                 .text_color(theme.colors.foreground)
@@ -300,7 +304,7 @@ impl Render for TranslateWindow {
                         div()
                             .text_size(px(13.))
                             .font_weight(FontWeight::MEDIUM)
-                            .child("沙拉翻译"),
+                            .child(SharedString::from(t("translate-title"))),
                     )
                     .child(
                         Button::new("close")
@@ -345,7 +349,7 @@ impl Render for TranslateWindow {
                         Button::new("translate")
                             .primary()
                             .small()
-                            .label("翻译")
+                            .label(SharedString::from(t("translate-action")))
                             .on_click(cx.listener(Self::start_translate)),
                     ),
             )
