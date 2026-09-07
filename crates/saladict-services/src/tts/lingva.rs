@@ -5,7 +5,6 @@
 //! 直接返回 JSON `{ audio: "<base64>" }`，这里解出 base64 还原成音频字节。
 
 use crate::Tts;
-use base64::Engine as _;
 use async_trait::async_trait;
 use base64::Engine;
 use saladict_core::map_language;

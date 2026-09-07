@@ -5,7 +5,7 @@
 use crate::Translator;
 use async_trait::async_trait;
 use saladict_core::schema::ConfigField;
-use saladict_core::{Error, HasConfig, Language, Result, TranslateRequest, TranslateResult};
+use saladict_core::{Error, HasConfig, Result, TranslateRequest, TranslateResult};
 use serde_json::{json, Value};
 
 pub struct Transmart;

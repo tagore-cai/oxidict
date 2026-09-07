@@ -193,7 +193,6 @@ pub fn request_path(req: &TranslateRequest, key: &str) -> Result<String> {
 
 /// Ollama 走原生 /api/chat 协议，响应结构与 OpenAI 不同，单独解析。
 pub async fn ollama_chat(url: &str, body: Value) -> Result<TranslateResult> {
-    use saladict_net::NetErr as _;
     let resp = saladict_net::post_json_value(url, &body).await?;
     let content = resp
         .get("message")

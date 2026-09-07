@@ -6,7 +6,6 @@
 use crate::Recognizer;
 use saladict_core::HasConfig as _;
 use saladict_net::NetErr as _;
-use base64::Engine as _;
 use async_trait::async_trait;
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
