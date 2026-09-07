@@ -1,0 +1,30 @@
+[package]
+name = "saladict-platform"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+saladict-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+log.workspace = true
+image.workspace = true
+arboard.workspace = true
+selection.workspace = true
+global-hotkey.workspace = true
+once_cell.workspace = true
+parking_lot.workspace = true
+lingua.workspace = true
+dirs.workspace = true
+
+# cross-platform capture / pointer (compiled on every target)
+screenshots.workspace = true
+mouse_position.workspace = true
+
+# Windows-only system OCR
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true }

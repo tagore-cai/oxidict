@@ -1,0 +1,22 @@
+[package]
+name = "saladict"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+saladict-core.workspace = true
+saladict-net.workspace = true
+saladict-platform.workspace = true
+saladict-services.workspace = true
+saladict-plugin.workspace = true
+saladict-server.workspace = true
+saladict-ui.workspace = true
+env_logger.workspace = true
+log.workspace = true
+tokio.workspace = true
+gpui-kit.workspace = true
+tray-icon.workspace = true
+libc = "0.2"
+dirs.workspace = true
