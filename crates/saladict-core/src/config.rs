@@ -315,13 +315,39 @@ impl ConfigStore {
             .unwrap_or(Language::ZhCn)
     }
 
+    /// 代理地址。若配置了用户名/密码，则拼成 `http://user:pass@host:port`。
+    ///
+    /// 带凭据的代理在企业网络里是常态，缺了它代理基本不可用。
     pub fn proxy(&self) -> Option<String> {
         if !self.get_or(keys::PROXY_ENABLE, false) {
             return None;
         }
         let host: String = self.get_or(keys::PROXY_HOST, "127.0.0.1".into());
         let port: u16 = self.get_or(keys::PROXY_PORT, 1087);
-        Some(format!("http://{}:{}", host, port))
+        let username: String = self.get_or(keys::PROXY_USERNAME, String::new());
+        let password: String = self.get_or(keys::PROXY_PASSWORD, String::new());
+
+        if username.is_empty() {
+            return Some(format!("http://{}:{}", host, port));
+        }
+        // 对 userinfo 做百分号编码，避免密码里的特殊字符破坏 URL。
+        let user = urlencoding::encode(&username);
+        let pass = urlencoding::encode(&password);
+        if password.is_empty() {
+            Some(format!("http://{}@{}:{}", user, host, port))
+        } else {
+            Some(format!("http://{}:{}@{}:{}", user, pass, host, port))
+        }
+    }
+
+    /// 不走代理的主机列表（逗号分隔），供上层 HTTP 客户端使用。
+    pub fn no_proxy(&self) -> Option<String> {
+        let v: String = self.get_or(keys::NO_PROXY, String::new());
+        if v.trim().is_empty() {
+            None
+        } else {
+            Some(v)
+        }
     }
 
     pub fn server_port(&self) -> u16 {

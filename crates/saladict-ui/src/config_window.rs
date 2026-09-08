@@ -83,6 +83,10 @@ pub struct ConfigWindow {
     proxy_host: Entity<InputState>,
     proxy_port: Entity<InputState>,
     saved_hint: bool,
+    // 代理认证
+    proxy_username: Entity<InputState>,
+    proxy_password: Entity<InputState>,
+    no_proxy: Entity<InputState>,
     // 备份
     webdav_url: Entity<InputState>,
     webdav_username: Entity<InputState>,
@@ -120,6 +124,25 @@ impl ConfigWindow {
         let proxy_port = cx.new(|cx| {
             InputState::new(window, cx)
                 .default_value(config().get_or(keys::PROXY_PORT, 1087).to_string())
+        });
+        let proxy_username = cx.new(|cx| {
+            InputState::new(window, cx).default_value(
+                config()
+                    .get::<String>(keys::PROXY_USERNAME)
+                    .unwrap_or_default(),
+            )
+        });
+        let proxy_password = cx.new(|cx| {
+            InputState::new(window, cx).default_value(
+                config()
+                    .get::<String>(keys::PROXY_PASSWORD)
+                    .unwrap_or_default(),
+            )
+        });
+        let no_proxy = cx.new(|cx| {
+            InputState::new(window, cx).default_value(
+                config().get::<String>(keys::NO_PROXY).unwrap_or_default(),
+            )
         });
 
         let webdav_url = cx.new(|cx| {
@@ -159,6 +182,9 @@ impl ConfigWindow {
             proxy_enable: config().get_or(keys::PROXY_ENABLE, false),
             proxy_host,
             proxy_port,
+            proxy_username,
+            proxy_password,
+            no_proxy,
             saved_hint: false,
             webdav_url,
             webdav_username,
@@ -379,6 +405,19 @@ impl ConfigWindow {
             .parse::<u16>()
             .unwrap_or(60606);
         let _ = store.set(keys::PROXY_PORT, &port);
+        // 代理认证与排除列表。
+        let _ = store.set(
+            keys::PROXY_USERNAME,
+            &self.proxy_username.read(cx).value().trim().to_string(),
+        );
+        let _ = store.set(
+            keys::PROXY_PASSWORD,
+            &self.proxy_password.read(cx).value().to_string(),
+        );
+        let _ = store.set(
+            keys::NO_PROXY,
+            &self.no_proxy.read(cx).value().trim().to_string(),
+        );
         // 代理变化需要重建 HTTP 客户端。
         saladict_net::rebuild_client();
         self.saved_hint = true;
@@ -1021,6 +1060,35 @@ impl ConfigWindow {
                         .border_color(border)
                         .child(div().text_size(px(13.)).text_color(fg).child(SharedString::from(t("config-proxy-port"))))
                         .child(Input::new(&self.proxy_port).w(px(200.)).small()),
+                );
+            // 代理认证（可选）：留空 = 匿名代理。
+            page = page
+                .child(
+                    h_flex()
+                        .w_full()
+                        .justify_between()
+                        .items_center()
+                        .py_2()
+                        .child(div().text_size(px(13.)).text_color(fg).child(SharedString::from(t("config-proxy-username"))))
+                        .child(Input::new(&self.proxy_username).w(px(200.)).small()),
+                )
+                .child(
+                    h_flex()
+                        .w_full()
+                        .justify_between()
+                        .items_center()
+                        .py_2()
+                        .child(div().text_size(px(13.)).text_color(fg).child(SharedString::from(t("config-proxy-password"))))
+                        .child(Input::new(&self.proxy_password).w(px(200.)).small()),
+                )
+                .child(
+                    h_flex()
+                        .w_full()
+                        .justify_between()
+                        .items_center()
+                        .py_2()
+                        .child(div().text_size(px(13.)).text_color(fg).child(SharedString::from(t("config-no-proxy"))))
+                        .child(Input::new(&self.no_proxy).w(px(280.)).small()),
                 );
         }
 

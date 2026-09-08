@@ -118,3 +118,6 @@ config-backup-local-hint = 本地备份（保存为 zip 文件或从备份文件
 config-backup-export = 导出到文件
 config-backup-import = 从文件导入
 config-backup-saved = 已保存
+config-proxy-username = 代理用户名
+config-proxy-password = 代理密码
+config-no-proxy = 不走代理的主机

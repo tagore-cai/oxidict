@@ -78,7 +78,9 @@ image = "0.25"
 rqrr = "0.11"
 arboard = "3.4"
 selection = "1.2"
-global-hotkey = "0.6"
+# 全局键盘监听（观察流制）：macOS CGEventTap / Windows WH_KEYBOARD_LL / Linux evdev。
+# 替换 global-hotkey：其 Linux 后端仅 x11-dl，Wayland（Ubuntu 22.04+/Fedora 默认）下失效。
+keytap = "0.4"
 tray-icon = "0.19"
 # cross-platform capture / pointer
 screenshots = "0.7.2"

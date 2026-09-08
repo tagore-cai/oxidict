@@ -118,3 +118,6 @@ config-backup-local-hint = Local backup (save as zip file or restore from backup
 config-backup-export = Export to file
 config-backup-import = Import from file
 config-backup-saved = Saved
+config-proxy-username = Proxy username
+config-proxy-password = Proxy password
+config-no-proxy = Bypass proxy for
