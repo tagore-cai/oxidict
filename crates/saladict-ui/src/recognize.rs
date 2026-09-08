@@ -80,9 +80,26 @@ impl RecognizeWindow {
             let _ = this.update(cx, |this, cx| {
                 this.recognizing = false;
                 match result {
-                    Ok(Ok(text)) => {
+                    Ok(Ok(mut text)) => {
+                        // recognize_delete_newline
+                        if saladict_core::config::config().get_or(
+                            saladict_core::config::keys::RECOGNIZE_DELETE_NEWLINE,
+                            false,
+                        ) {
+                            text = text.replace('\n', " ");
+                        }
                         this.text = text;
                         this.error = None;
+                        // recognize_auto_copy: 1=复制结果, 2=复制并翻译
+                        let auto = saladict_core::config::config().get_or(
+                            saladict_core::config::keys::RECOGNIZE_AUTO_COPY,
+                            4,
+                        );
+                        if auto == 1 || auto == 2 {
+                            cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(
+                                this.text.clone(),
+                            ));
+                        }
                     }
                     Ok(Err(e)) => {
                         this.error = Some(e.to_string());

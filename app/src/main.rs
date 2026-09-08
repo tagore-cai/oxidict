@@ -21,14 +21,16 @@ fn translate_once(text: &str) -> Result<(String, TranslateResult)> {
     let req = TranslateRequest::new(text, from, to).with_config(cfg);
     let result = saladict_core::runtime::handle().block_on(svc.translate(req))?;
 
-    // 写入历史库，与老版本行为一致。
-    let _ = saladict_core::history::History::global().add(
-        text,
-        from.code(),
-        to.code(),
-        instance,
-        &result.as_text(),
-    );
+    // 写入历史库（history_disable 为 true 时跳过）。
+    if !store.get_or(saladict_core::config::keys::HISTORY_DISABLE, false) {
+        let _ = saladict_core::history::History::global().add(
+            text,
+            from.code(),
+            to.code(),
+            instance,
+            &result.as_text(),
+        );
+    }
     Ok((instance.to_string(), result))
 }
 

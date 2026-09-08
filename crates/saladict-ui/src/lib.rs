@@ -10,6 +10,7 @@ pub mod updater;
 pub mod recognize;
 pub mod plugin_host;
 pub mod config_window;
+pub mod input_translate;
 
 use gpui_kit::component::Root;
 use gpui_kit::AppContext as _;
@@ -151,9 +152,8 @@ pub fn launch(cx: &mut App, tx: UnboundedSender<TrayCommand>, mut rx: UnboundedR
                         Err(e) => log::warn!("截图任务被取消: {e}"),
                     }
                 }
-                // 输入翻译：窗口已开则复用（聚焦由用户点击完成），未开则打开空窗口。
                 TrayCommand::InputTranslate => {
-                    let _ = cx.update(|cx| open_translate_window(cx));
+                    let _ = cx.update(|cx| input_translate::open_input_translate(cx));
                 }
                 TrayCommand::OpenSettings => {
                     let _ = cx.update(|cx| crate::config_window::open_config(cx));

@@ -37,3 +37,4 @@ pub mod hotkey;
 pub mod clipboard;
 pub mod mouse;
 pub mod detect;
+pub mod autostart;

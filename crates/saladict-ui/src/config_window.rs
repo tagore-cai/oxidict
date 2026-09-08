@@ -78,6 +78,7 @@ pub struct ConfigWindow {
     hotkey_inputs: Vec<(&'static str, Entity<InputState>, &'static str)>,
     clipboard_monitor: bool,
     dark_mode: bool,
+    autostart: bool,
     proxy_enable: bool,
     proxy_host: Entity<InputState>,
     proxy_port: Entity<InputState>,
@@ -150,6 +151,7 @@ impl ConfigWindow {
             scroll: ScrollHandle::new(),
             hotkey_inputs,
             clipboard_monitor: config().get_or(keys::CLIPBOARD_MONITOR, false),
+            autostart: saladict_platform::autostart::is_enabled(),
             dark_mode: {
                 let theme: String = config().get_or(keys::APP_THEME, "system".into());
                 theme == "dark"

@@ -6,7 +6,7 @@
 
 use gpui_kit::base::{h_flex, v_flex};
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::input::{Textarea, TextareaState};
+use gpui_kit::component::input::{InputEvent, Textarea, TextareaState};
 use gpui_kit::component::select::{Select, SelectState};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
@@ -46,6 +46,8 @@ pub struct TranslateWindow {
     instances: Vec<String>,
     cards: Vec<Card>,
     scroll: ScrollHandle,
+    /// dynamic_translate 的防抖代次，每次文本变化 +1，延迟后比较代次决定是否翻译。
+    dynamic_generation: std::cell::Cell<u64>,
 }
 
 impl TranslateWindow {
@@ -82,14 +84,53 @@ impl TranslateWindow {
             })
             .collect();
 
-        Self {
+        let mut this = Self {
             source,
             source_lang,
             target_lang,
             instances,
             cards,
             scroll: ScrollHandle::new(),
+            dynamic_generation: std::cell::Cell::new(0),
+        };
+
+        // dynamic_translate：文本变化后 500ms 防抖自动翻译。
+        if store.get_or(saladict_core::config::keys::DYNAMIC_TRANSLATE, false) {
+            cx.subscribe_in(&this.source, window, Self::on_source_changed).detach();
         }
+
+        this
+    }
+
+    /// dynamic_translate 的输入变化处理：递增代次 → 延迟 500ms → 代次未变则翻译。
+    fn on_source_changed(
+        &mut self,
+        _: &Entity<TextareaState>,
+        event: &InputEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !matches!(event, InputEvent::Change) {
+            return;
+        }
+        let gen = self.dynamic_generation.get() + 1;
+        self.dynamic_generation.set(gen);
+        cx.spawn_in(window, async move |this, cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(500))
+                .await;
+            // 代次不匹配说明用户还在输入，跳过。
+            let _ = this.update(cx, |this, cx| {
+                if this.dynamic_generation.get() != gen {
+                    return;
+                }
+                let text = this.source.read(cx).value().trim().to_string();
+                if !text.is_empty() {
+                    this.run_translate(text, cx);
+                }
+            });
+        })
+        .detach();
     }
 
     fn selected_language(
@@ -114,14 +155,14 @@ impl TranslateWindow {
         if text.is_empty() {
             return;
         }
-        self.run_translate(text, window, cx);
+        self.run_translate(text, cx);
     }
 
     /// 用已写入输入框的文本触发翻译（点「翻译」按钮的等价逻辑）。
-    fn run_translate(&mut self, text: String, _window: &mut Window, cx: &mut Context<Self>) {
+    fn run_translate(&mut self, text: String, cx: &mut Context<Self>) {
+        let store = config();
         let from = self.selected_language(&self.source_lang, cx, Language::Auto);
         let to = self.selected_language(&self.target_lang, cx, Language::ZhCn);
-        let store = config();
         // 记住语言选择，与原 translate_remember_language 行为一致。
         let _ = store.set(
             saladict_core::config::keys::TRANSLATE_SOURCE_LANGUAGE,
@@ -131,6 +172,13 @@ impl TranslateWindow {
             saladict_core::config::keys::TRANSLATE_TARGET_LANGUAGE,
             &to.code().to_string(),
         );
+
+        // translate_delete_newline：非 0 时去除换行符。
+        let text = if store.get_or(saladict_core::config::keys::TRANSLATE_DELETE_NEWLINE, 0) > 0 {
+            text.replace('\n', " ")
+        } else {
+            text
+        };
 
         for card in self.cards.iter_mut() {
             card.state = CardState::Loading;
@@ -194,7 +242,7 @@ impl TranslateWindow {
         // 用 replace_all 而非 set_value：保留撤销栈，且与用户编辑行为一致。
         self.source
             .update(cx, |source, cx| source.replace_all(text.clone(), window, cx));
-        self.run_translate(text, window, cx);
+        self.run_translate(text, cx);
     }
 
     fn swap_languages(&mut self, _: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
