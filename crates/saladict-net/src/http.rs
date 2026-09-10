@@ -28,7 +28,12 @@ fn build_client() -> Client {
     {
         builder = builder.proxy(p);
     }
-    builder.build().unwrap_or_else(|_| Client::new())
+    // 构建失败极罕见（TLS 后端初始化问题），但静默回退会丢掉 UA/超时/代理
+    // 等全部配置且无从排查，至少要把原因记下来。
+    builder.build().unwrap_or_else(|e| {
+        log::warn!("构建 HTTP client 失败（代理配置可能未生效），回退默认 client: {e}");
+        Client::new()
+    })
 }
 
 /// 进程内共享的 HTTP 客户端。代理配置变化后调用 [`rebuild_client`] 热更新。
