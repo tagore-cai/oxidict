@@ -3,19 +3,19 @@
 //! 原版按快捷键弹出独立小窗（320x180），带 Textarea + 翻译按钮 + 结果显示。
 //! 按 Enter 翻译，Esc 关闭。与主翻译窗口独立，不共享状态。
 
+use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{ActiveTheme, Sizable};
-use gpui_kit::AppContext as _;
 use gpui_kit::{
-    div, px, App, Bounds, Context, Entity, IntoElement, ParentElement, Point, Render, SharedString,
-    Size, Styled, TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions,
+    App, Bounds, Context, Entity, IntoElement, ParentElement, Point, Render, SharedString, Size,
+    Styled, TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions, div, px,
 };
+use saladict_core::TranslateRequest;
 use saladict_core::config::config;
 use saladict_core::i18n::t;
-use saladict_core::TranslateRequest;
 use saladict_services::spawn_translate;
 use std::sync::Arc;
 

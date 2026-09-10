@@ -1,6 +1,6 @@
 //! WebDAV 云端备份（raw reqwest 实现，不依赖 reqwest_dav）。
 
-use crate::{check, client, NetErr};
+use crate::{NetErr, check, client};
 use saladict_core::{Error, Result};
 
 pub struct WebDavConfig {

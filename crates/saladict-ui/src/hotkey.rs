@@ -11,12 +11,12 @@
 //! （`saladict_platform::hotkey`，keytap 观察流）负责**生效**。产物字符串
 //! 直接兼容 `hotkey::parse`。
 
-use crate::tray::{send_command, TrayCommand};
+use crate::tray::{TrayCommand, send_command};
 use gpui_kit::component::{ActiveTheme, Sizable, Size, StyledExt};
 use gpui_kit::{
-    div, px, App, Context, Empty, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
+    App, Context, Empty, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
     KeyDownEvent, Keystroke, ParentElement, Render, RenderOnce, SharedString, StyleRefinement,
-    Styled, Window,
+    Styled, Window, div, px,
 };
 
 /// 把 gpui 的按键事件合成 `Saladict` 配置用的加速键字符串（`Ctrl+Alt+T`）。
@@ -174,10 +174,8 @@ impl HotkeyRecorderState {
         // 值未变化（如重复回填初始值）不触发回调，避免重复写配置/注册。
         let changed = self.value != value;
         self.value = value;
-        if changed {
-            if let Some(cb) = &self.on_change {
-                cb(&self.value, cx);
-            }
+        if changed && let Some(cb) = &self.on_change {
+            cb(&self.value, cx);
         }
         cx.notify();
     }

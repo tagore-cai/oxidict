@@ -9,7 +9,7 @@ use crate::Translator;
 use async_trait::async_trait;
 use saladict_core::schema::ConfigField;
 use saladict_core::{Error, HasConfig, Result, TranslateRequest, TranslateResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub struct Geminipro;
 
@@ -123,17 +123,15 @@ impl Translator for Geminipro {
         let mut target = String::new();
         while let Some(line) = stream.next().await {
             let line = line?;
-            if let Some(payload) = saladict_net::sse_payload(&line) {
-                if let Ok(chunk) = serde_json::from_str::<Value>(payload) {
-                    if let Some(text) = chunk
-                        .pointer("/candidates/0/content/parts/0/text")
-                        .and_then(|v| v.as_str())
-                    {
-                        target.push_str(text);
-                        if let Some(sink) = req.on_stream.as_ref() {
-                            sink(format!("{}_", target));
-                        }
-                    }
+            if let Some(payload) = saladict_net::sse_payload(&line)
+                && let Ok(chunk) = serde_json::from_str::<Value>(payload)
+                && let Some(text) = chunk
+                    .pointer("/candidates/0/content/parts/0/text")
+                    .and_then(|v| v.as_str())
+            {
+                target.push_str(text);
+                if let Some(sink) = req.on_stream.as_ref() {
+                    sink(format!("{}_", target));
                 }
             }
         }

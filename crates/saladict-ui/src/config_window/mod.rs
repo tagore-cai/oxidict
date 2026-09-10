@@ -14,20 +14,20 @@ mod pages;
 mod services;
 
 use crate::hotkey::HotkeyRecorderState;
+use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::select::SelectState;
 use gpui_kit::component::{ActiveTheme, Icon, IconName, Sizable};
 use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::AppContext as _;
 use gpui_kit::{
-    div, px, App, Bounds, Context, Entity, InteractiveElement, IntoElement, ParentElement, Point,
-    Render, ScrollHandle, SharedString, Size, StatefulInteractiveElement, Styled, TitlebarOptions,
-    Window, WindowBounds, WindowKind, WindowOptions,
+    App, Bounds, Context, Entity, InteractiveElement, IntoElement, ParentElement, Point, Render,
+    ScrollHandle, SharedString, Size, StatefulInteractiveElement, Styled, TitlebarOptions, Window,
+    WindowBounds, WindowKind, WindowOptions, div, px,
 };
+use saladict_core::ServiceKind;
 use saladict_core::config::{config, keys};
 use saladict_core::i18n::{t, t_args};
-use saladict_core::ServiceKind;
 use services::FormState;
 
 /// 侧栏导航项：图标 + 标题（标题存 i18n key，渲染时再 `t()` 翻译）。
@@ -111,14 +111,14 @@ impl ConfigWindow {
                 HotkeyRecorderState::new(window, cx).on_change(move |v, cx| {
                     // 冲突检测：组合键已绑到其它动作时拒绝写入，通知用户
                     // （原版 isRegistered + toast 的对等实现）。
-                    if !v.is_empty() {
-                        if let Some(other) = saladict_platform::hotkey::find_conflict(v, name) {
-                            crate::notify::open_notify(
-                                cx,
-                                t_args("config-hotkey-conflict", &[("name", &other)]),
-                            );
-                            return;
-                        }
+                    if !v.is_empty()
+                        && let Some(other) = saladict_platform::hotkey::find_conflict(v, name)
+                    {
+                        crate::notify::open_notify(
+                            cx,
+                            t_args("config-hotkey-conflict", &[("name", &other)]),
+                        );
+                        return;
                     }
                     let _ = config().set(&key_name, &v.to_string());
                     // 录入即生效：注册（非空）/注销（空）。

@@ -14,9 +14,9 @@ use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    div, img, px, relative, AnyElement, AppContext, ClickEvent, ClipboardItem, Context, Entity,
-    FontWeight, InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement, Styled, Window,
+    AnyElement, AppContext, ClickEvent, ClipboardItem, Context, Entity, FontWeight,
+    InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle, SharedString,
+    StatefulInteractiveElement, Styled, Window, div, img, px, relative,
 };
 use saladict_core::config::{config, keys, parse_instance};
 use saladict_core::i18n::{t, t_args};
@@ -163,15 +163,15 @@ impl TranslateWindow {
         if !matches!(event, InputEvent::Change) {
             return;
         }
-        let gen = self.dynamic_generation.get() + 1;
-        self.dynamic_generation.set(gen);
+        let r#gen = self.dynamic_generation.get() + 1;
+        self.dynamic_generation.set(r#gen);
         cx.spawn_in(window, async move |this, cx| {
             cx.background_executor()
                 .timer(std::time::Duration::from_millis(500))
                 .await;
             // 代次不匹配说明用户还在输入，跳过。
             let _ = this.update_in(cx, |this, window, cx| {
-                if this.dynamic_generation.get() != gen {
+                if this.dynamic_generation.get() != r#gen {
                     return;
                 }
                 let text = this.source.read(cx).value().trim().to_string();
@@ -230,20 +230,19 @@ impl TranslateWindow {
         // 把具体语言传给服务（UI 下拉仍保持「自动检测」，与原版行为一致）。
         if from == Language::Auto
             && store.get_or(keys::TRANSLATE_DETECT_ENGINE, String::from("local")) == "local"
+            && let Some(detected) = saladict_platform::detect::detect(&text)
         {
-            if let Some(detected) = saladict_platform::detect::detect(&text) {
-                from = detected;
-            }
+            from = detected;
         }
 
         // translate_second_language：目标语与源语相同（无法翻译自己）时，
         // 自动改用配置的第二目标语，避免服务报「相同语言」错误。
         if from != Language::Auto && from == to {
             let second = store.get_or(keys::TRANSLATE_SECOND_LANGUAGE, String::from("zh_cn"));
-            if let Some(second) = Language::from_code(&second) {
-                if second != Language::Auto {
-                    to = second;
-                }
+            if let Some(second) = Language::from_code(&second)
+                && second != Language::Auto
+            {
+                to = second;
             }
         }
 
@@ -410,10 +409,10 @@ impl TranslateWindow {
     }
 
     fn copy_result(&mut self, idx: usize, _: &mut Window, cx: &mut Context<Self>) {
-        if let Some(card) = self.cards.get(idx) {
-            if let CardState::Done(result) = &card.state {
-                cx.write_to_clipboard(ClipboardItem::new_string(result.as_text()));
-            }
+        if let Some(card) = self.cards.get(idx)
+            && let CardState::Done(result) = &card.state
+        {
+            cx.write_to_clipboard(ClipboardItem::new_string(result.as_text()));
         }
     }
 

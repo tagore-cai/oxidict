@@ -3,15 +3,15 @@
 //! 对应原 `src/window/Notify`：一个 always-on-top 的小窗，显示一条消息，
 //! 3 秒后自动关闭，也可手动点关闭按钮立即关闭。
 
+use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
+use gpui_kit::component::Root;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::button::ButtonVariants as _;
-use gpui_kit::component::Root;
 use gpui_kit::component::{ActiveTheme, IconName, Sizable};
-use gpui_kit::AppContext as _;
 use gpui_kit::{
-    div, px, App, AsyncApp, Bounds, Context, FontWeight, IntoElement, ParentElement, Point, Render,
-    SharedString, Size, Styled, Window, WindowBounds, WindowKind, WindowOptions,
+    App, AsyncApp, Bounds, Context, FontWeight, IntoElement, ParentElement, Point, Render,
+    SharedString, Size, Styled, Window, WindowBounds, WindowKind, WindowOptions, div, px,
 };
 use saladict_core::i18n::t;
 use std::time::Duration;

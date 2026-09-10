@@ -7,13 +7,13 @@ use saladict_core::{Language, Result};
 
 pub fn system_ocr(image: &[u8], lang: Language) -> Result<String> {
     fn inner(image: &[u8], lang: Language) -> anyhow::Result<String> {
-        use windows::core::HSTRING;
         use windows::Globalization::Language as WinLanguage;
         use windows::Graphics::Imaging::BitmapDecoder;
         use windows::Media::Ocr::OcrEngine;
         use windows::Storage::Streams::{
             DataWriter, IRandomAccessStream, InMemoryRandomAccessStream,
         };
+        use windows::core::HSTRING;
 
         // 把图像字节灌入内存流，再解码为 SoftwareBitmap。
         let stream: IRandomAccessStream = InMemoryRandomAccessStream::new()?.into();

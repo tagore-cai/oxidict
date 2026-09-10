@@ -5,12 +5,12 @@
 
 use crate::Recognizer;
 use async_trait::async_trait;
-use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as B64;
 use chrono::Utc;
+use saladict_core::HasConfig as _;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::HasConfig as _;
 use saladict_core::{Error, Language, RecognizeRequest, Result};
 use saladict_net::NetErr as _;
 use saladict_net::{check, hmac_sha256_base64, post_with_headers};

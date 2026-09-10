@@ -6,10 +6,10 @@
 //! 语言文件放在仓库根的 `locales/<lang>/main.ftl`，运行时通过
 //! [`fluent_templates::static_loader`] 编译期嵌入，无需外部文件依赖。
 
-use fluent_templates::{static_loader, Loader};
+use fluent_templates::{Loader, static_loader};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use unic_langid::{langid, LanguageIdentifier};
+use unic_langid::{LanguageIdentifier, langid};
 
 // 编译期嵌入 locales/<lang>/main.ftl。fallback 为英文。
 static_loader! {

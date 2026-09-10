@@ -7,8 +7,8 @@
 use super::openai_compatible as compat;
 use crate::Translator;
 use async_trait::async_trait;
-use saladict_core::schema::ConfigField;
 use saladict_core::HasConfig as _;
+use saladict_core::schema::ConfigField;
 use saladict_core::{Result, TranslateRequest, TranslateResult};
 
 pub struct Openai;

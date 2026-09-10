@@ -5,9 +5,9 @@
 //! 由独立线程从 `MenuEvent::receiver()` 读取，转成 [`TrayCommand`] 发到 channel，
 //! 再由 GPUI 侧的命令循环消费——这样 GUI 状态变更都发生在 GPUI 执行器上。
 
-use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::Arc;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 use saladict_core::i18n::{t, t_args};
 
@@ -346,23 +346,26 @@ pub fn toggle_clipboard_monitor() {
     // 生命周期内不回收）；所有调用点（托盘菜单回调、GPUI 命令循环）都在
     // 主线程串行执行，同一时刻不存在其他引用，`&mut` 不构成别名违例。
     let state = unsafe { &mut *ptr };
-    if let Some(handle) = state.monitor.take() {
-        handle.stop();
-        state.clipboard_item.set_checked(false);
-        log::info!("{}", t("tray-clipboard-off"));
-    } else {
-        let handle = saladict_platform::clipboard::start_monitor(Arc::new(|text| {
-            log::info!(
-                "{}",
-                t_args(
-                    "tray-clipboard-captured",
-                    &[("count", &text.chars().count().to_string())]
-                )
-            );
-        }));
-        state.monitor = Some(handle);
-        state.clipboard_item.set_checked(true);
-        log::info!("{}", t("tray-clipboard-on"));
+    match state.monitor.take() {
+        Some(handle) => {
+            handle.stop();
+            state.clipboard_item.set_checked(false);
+            log::info!("{}", t("tray-clipboard-off"));
+        }
+        _ => {
+            let handle = saladict_platform::clipboard::start_monitor(Arc::new(|text| {
+                log::info!(
+                    "{}",
+                    t_args(
+                        "tray-clipboard-captured",
+                        &[("count", &text.chars().count().to_string())]
+                    )
+                );
+            }));
+            state.monitor = Some(handle);
+            state.clipboard_item.set_checked(true);
+            log::info!("{}", t("tray-clipboard-on"));
+        }
     }
 }
 

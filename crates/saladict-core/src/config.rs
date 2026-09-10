@@ -7,9 +7,9 @@ use crate::error::{Error, Result};
 use crate::language::Language;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{json, Map, Value};
+use serde::de::DeserializeOwned;
+use serde_json::{Map, Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -396,11 +396,7 @@ impl ConfigStore {
     /// 不走代理的主机列表（逗号分隔），供上层 HTTP 客户端使用。
     pub fn no_proxy(&self) -> Option<String> {
         let v: String = self.get_or(keys::NO_PROXY, String::new());
-        if v.trim().is_empty() {
-            None
-        } else {
-            Some(v)
-        }
+        if v.trim().is_empty() { None } else { Some(v) }
     }
 
     pub fn server_port(&self) -> u16 {
@@ -425,14 +421,14 @@ where
     let dir = store.app_dir();
     let mut watcher = notify::recommended_watcher(
         move |res: std::result::Result<notify::Event, notify::Error>| {
-            if let Ok(event) = res {
-                if matches!(
+            if let Ok(event) = res
+                && matches!(
                     event.kind,
                     EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
-                ) {
-                    let _ = store.reload();
-                    on_change();
-                }
+                )
+            {
+                let _ = store.reload();
+                on_change();
             }
         },
     )

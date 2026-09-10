@@ -240,7 +240,7 @@ impl fmt::Display for Language {
 /// ```
 #[macro_export]
 macro_rules! map_language {
-    ($lang:expr, { $($variant:ident => $code:expr),* $(,)? }) => {
+    ($lang:expr_2021, { $($variant:ident => $code:expr_2021),* $(,)? }) => {
         match $lang {
             $( $crate::language::Language::$variant => ::std::string::ToString::to_string($code), )*
             other => other.code().to_string(),

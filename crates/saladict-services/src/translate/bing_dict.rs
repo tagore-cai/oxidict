@@ -95,10 +95,10 @@ impl Translator for BingDict {
                     .and_then(|d| d.as_str())
                     .or_else(|| v.get("name").and_then(|n| n.as_str()))
             });
-            if let Some(group) = group {
-                if let Some(bucket) = groups.get_mut(group) {
-                    bucket.push(g);
-                }
+            if let Some(group) = group
+                && let Some(bucket) = groups.get_mut(group)
+            {
+                bucket.push(g);
             }
         }
 
@@ -151,21 +151,19 @@ impl Translator for BingDict {
         }
 
         // 变形（取第一个 group 的 fragments 文本）
-        if let Some(assoc) = groups.get("变形") {
-            if let Some(first) = assoc.first() {
-                if let Some(frags) = first
-                    .get("meanings")
-                    .and_then(|v| v.get(0))
-                    .and_then(|v| v.get("richDefinitions"))
-                    .and_then(|v| v.get(0))
-                    .and_then(|v| v.get("fragments"))
-                    .and_then(|v| v.as_array())
-                {
-                    for f in frags {
-                        if let Some(t) = f.get("text").and_then(|v| v.as_str()) {
-                            dict.associations.push(t.to_string());
-                        }
-                    }
+        if let Some(assoc) = groups.get("变形")
+            && let Some(first) = assoc.first()
+            && let Some(frags) = first
+                .get("meanings")
+                .and_then(|v| v.get(0))
+                .and_then(|v| v.get("richDefinitions"))
+                .and_then(|v| v.get(0))
+                .and_then(|v| v.get("fragments"))
+                .and_then(|v| v.as_array())
+        {
+            for f in frags {
+                if let Some(t) = f.get("text").and_then(|v| v.as_str()) {
+                    dict.associations.push(t.to_string());
                 }
             }
         }

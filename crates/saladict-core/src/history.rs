@@ -7,7 +7,7 @@ use crate::error::Result;
 use crate::model::HistoryEntry;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::path::PathBuf;
 use std::sync::Arc;
 

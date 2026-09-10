@@ -4,22 +4,22 @@
 //! 唯一实现；表单结构来自服务的 `config_schema()`，不再逐服务手写。
 
 use super::pages::{labeled_field, placeholder_text};
-use super::{nav_kind, ConfigWindow, KIND_TABS};
-use gpui_kit::base::{h_flex, v_flex, IndexPath};
+use super::{ConfigWindow, KIND_TABS, nav_kind};
+use gpui_kit::AppContext as _;
+use gpui_kit::base::{IndexPath, h_flex, v_flex};
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::select::{Select, SelectState};
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
 use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::AppContext as _;
 use gpui_kit::{
-    div, img, px, Context, Entity, IntoElement, ParentElement, SharedString, Styled, Window,
+    Context, Entity, IntoElement, ParentElement, SharedString, Styled, Window, div, img, px,
 };
+use saladict_core::ServiceKind;
 use saladict_core::config::{config, parse_instance};
 use saladict_core::i18n::{t, t_args};
 use saladict_core::schema::ConfigField;
-use saladict_core::ServiceKind;
 use saladict_services::services;
 
 /// 下拉字段：`(配置键, 选择状态实体, 可选项的值列表)`。

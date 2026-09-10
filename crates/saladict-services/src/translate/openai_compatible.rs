@@ -6,7 +6,7 @@
 
 use saladict_core::{Error, Language, Result, StreamSink, TranslateRequest, TranslateResult};
 use saladict_net::NetErr as _;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// LLM 提示词里的语言用完整英文名，翻译质量比语言码好。
 pub fn language_display(lang: Language) -> &'static str {
@@ -128,17 +128,15 @@ pub async fn chat_completions(
         let mut target = String::new();
         while let Some(line) = stream.next().await {
             let line = line?;
-            if let Some(payload) = saladict_net::sse_payload(&line) {
-                if let Ok(chunk) = serde_json::from_str::<Value>(payload) {
-                    if let Some(delta) = chunk
-                        .pointer("/choices/0/delta/content")
-                        .and_then(|v| v.as_str())
-                    {
-                        target.push_str(delta);
-                        if let Some(sink) = sink {
-                            sink(format!("{}_", target));
-                        }
-                    }
+            if let Some(payload) = saladict_net::sse_payload(&line)
+                && let Ok(chunk) = serde_json::from_str::<Value>(payload)
+                && let Some(delta) = chunk
+                    .pointer("/choices/0/delta/content")
+                    .and_then(|v| v.as_str())
+            {
+                target.push_str(delta);
+                if let Some(sink) = sink {
+                    sink(format!("{}_", target));
                 }
             }
         }

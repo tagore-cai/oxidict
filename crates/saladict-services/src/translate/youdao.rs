@@ -103,13 +103,11 @@ impl Translator for Youdao {
                     });
                 }
             }
-            if !has_voice {
-                if let Some(symbol) = basic.get("phonetic").and_then(|v| v.as_str()) {
-                    dict.pronunciations.push(Pronunciation {
-                        symbol: Some(symbol.to_string()),
-                        voice: None,
-                    });
-                }
+            if !has_voice && let Some(symbol) = basic.get("phonetic").and_then(|v| v.as_str()) {
+                dict.pronunciations.push(Pronunciation {
+                    symbol: Some(symbol.to_string()),
+                    voice: None,
+                });
             }
 
             if let Some(explains) = basic.get("explains").and_then(|v| v.as_array()) {

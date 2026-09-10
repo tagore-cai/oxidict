@@ -33,8 +33,8 @@ use keytap::{EventKind, Key, Tap};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// 归一化后的修饰键（左右键合一）。
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]

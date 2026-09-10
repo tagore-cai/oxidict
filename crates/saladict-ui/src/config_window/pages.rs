@@ -8,12 +8,12 @@ use gpui_kit::component::input::{Input, InputContentType, InputState};
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
 use gpui_kit::{
-    div, px, Context, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, Styled,
-    Window,
+    Context, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, Window,
+    div, px,
 };
+use saladict_core::Error;
 use saladict_core::config::{config, keys};
 use saladict_core::i18n::{t, t_args};
-use saladict_core::Error;
 
 /// 多行文本单行化并截断（历史列表预览用）。
 fn one_line(text: &str, max_chars: usize) -> String {

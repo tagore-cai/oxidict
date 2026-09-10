@@ -6,8 +6,8 @@
 use futures::Stream;
 use reqwest::{Client, IntoUrl, RequestBuilder, Response};
 use saladict_core::{Error, Result};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -23,10 +23,10 @@ fn build_client() -> Client {
         .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10));
 
-    if let Some(proxy) = saladict_core::config::config().proxy() {
-        if let Ok(p) = reqwest::Proxy::http(&proxy) {
-            builder = builder.proxy(p);
-        }
+    if let Some(proxy) = saladict_core::config::config().proxy()
+        && let Ok(p) = reqwest::Proxy::http(&proxy)
+    {
+        builder = builder.proxy(p);
     }
     builder.build().unwrap_or_else(|_| Client::new())
 }

@@ -4,8 +4,8 @@
 //! 装完不需要任何改写——运行时直接 eval 原始 `main.js`。
 
 use crate::{Error, Result};
-use saladict_core::config::ConfigStore;
 use saladict_core::ServiceKind;
+use saladict_core::config::ConfigStore;
 use std::fs::File;
 use std::path::Path;
 
@@ -77,12 +77,11 @@ pub fn installed(kind: ServiceKind, store: &ConfigStore) -> Vec<String> {
     let mut out = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                if let Some(name) = entry.file_name().to_str() {
-                    if name.starts_with("plugin") {
-                        out.push(name.to_string());
-                    }
-                }
+            if entry.path().is_dir()
+                && let Some(name) = entry.file_name().to_str()
+                && name.starts_with("plugin")
+            {
+                out.push(name.to_string());
             }
         }
     }

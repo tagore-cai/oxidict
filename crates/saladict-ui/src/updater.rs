@@ -3,16 +3,16 @@
 //! 对应原 `src/window/Updater`：显示当前版本，「检查更新」按钮拉取 GitHub
 //! latest release 接口，「前往下载」按钮用系统浏览器打开发布页。
 
+use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
+use gpui_kit::component::Root;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::button::ButtonVariants as _;
-use gpui_kit::component::Root;
 use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
-use gpui_kit::AppContext as _;
 use gpui_kit::{
-    div, px, AnyElement, App, AsyncApp, Bounds, ClickEvent, Context, FontWeight,
-    InteractiveElement, IntoElement, ParentElement, Point, Render, SharedString, Size, Styled,
-    TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions,
+    AnyElement, App, AsyncApp, Bounds, ClickEvent, Context, FontWeight, InteractiveElement,
+    IntoElement, ParentElement, Point, Render, SharedString, Size, Styled, TitlebarOptions, Window,
+    WindowBounds, WindowKind, WindowOptions, div, px,
 };
 use saladict_core::i18n::{t, t_args};
 use saladict_net::get_value;

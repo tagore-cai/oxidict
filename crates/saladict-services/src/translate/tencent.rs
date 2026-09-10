@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
 use saladict_core::{Error, HasConfig, Language, Result, TranslateRequest, TranslateResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub struct Tencent;
 

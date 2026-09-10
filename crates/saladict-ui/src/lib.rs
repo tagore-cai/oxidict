@@ -13,18 +13,18 @@ pub mod translate_window;
 pub mod tray;
 pub mod updater;
 
-use gpui_kit::component::Root;
 use gpui_kit::AppContext as _;
+use gpui_kit::component::Root;
 use gpui_kit::{
-    px, App, Bounds, Pixels, Point, Size, TitlebarOptions, WindowBounds, WindowHandle, WindowKind,
-    WindowOptions,
+    App, Bounds, Pixels, Point, Size, TitlebarOptions, WindowBounds, WindowHandle, WindowKind,
+    WindowOptions, px,
 };
 use gpui_kit::{Global, WeakEntity};
 use saladict_core::config::{config, keys};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::translate_window::TranslateWindow;
-use crate::tray::{toggle_clipboard_monitor, TrayCommand};
+use crate::tray::{TrayCommand, toggle_clipboard_monitor};
 
 /// 全局保存翻译窗口的弱引用与窗口句柄：view 供「复用已打开的窗口」，
 /// window 供翻译完成后的自动隐藏（hide_window）等窗口级操作。

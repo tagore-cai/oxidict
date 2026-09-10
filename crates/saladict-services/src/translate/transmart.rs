@@ -6,7 +6,7 @@ use crate::Translator;
 use async_trait::async_trait;
 use saladict_core::schema::ConfigField;
 use saladict_core::{Error, HasConfig, Result, TranslateRequest, TranslateResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub struct Transmart;
 
@@ -44,11 +44,12 @@ impl Translator for Transmart {
             "client_key": CLIENT_KEY,
         });
         // 用户名与令牌都填写时才带上鉴权，与原实现一致。
-        if let (Some(user), Some(token)) = (req.str("username"), req.str("token")) {
-            if !user.is_empty() && !token.is_empty() {
-                header["user"] = json!(user);
-                header["token"] = json!(token);
-            }
+        if let (Some(user), Some(token)) = (req.str("username"), req.str("token"))
+            && !user.is_empty()
+            && !token.is_empty()
+        {
+            header["user"] = json!(user);
+            header["token"] = json!(token);
         }
 
         let body = json!({

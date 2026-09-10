@@ -257,15 +257,14 @@ impl Translator for CambridgeDict {
 
             // 例句（第一个 .eg）
             for def in elements_inner(entry, "ddef_block") {
-                if let Some(p) = def.find("examp") {
-                    if def[p..].contains("eg") {
-                        if let Some(eg) = text_of(&def, "eg") {
-                            dict.sentence.push(Sentence {
-                                source: Some(eg),
-                                target: None,
-                            });
-                        }
-                    }
+                if let Some(p) = def.find("examp")
+                    && def[p..].contains("eg")
+                    && let Some(eg) = text_of(&def, "eg")
+                {
+                    dict.sentence.push(Sentence {
+                        source: Some(eg),
+                        target: None,
+                    });
                 }
             }
         }

@@ -5,9 +5,9 @@
 
 use crate::Translator;
 use async_trait::async_trait;
+use saladict_core::HasConfig as _;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::HasConfig as _;
 use saladict_core::{Error, Language, Result, TranslateRequest, TranslateResult};
 use saladict_net::NetErr as _;
 use saladict_net::{check, post_with_headers};

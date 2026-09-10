@@ -80,10 +80,10 @@ impl Eudic {
             .and_then(|v| v.as_array())
             .ok_or_else(|| Error::Service("获取生词本分类失败".into()))?;
         for item in data {
-            if item.get("name").and_then(|v| v.as_str()) == Some(name) {
-                if let Some(id) = item.get("id").and_then(|v| v.as_i64()) {
-                    return Ok(id);
-                }
+            if item.get("name").and_then(|v| v.as_str()) == Some(name)
+                && let Some(id) = item.get("id").and_then(|v| v.as_i64())
+            {
+                return Ok(id);
             }
         }
 

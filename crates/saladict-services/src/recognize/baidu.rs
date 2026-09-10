@@ -6,9 +6,9 @@
 use crate::Recognizer;
 use async_trait::async_trait;
 use base64::Engine as _;
+use saladict_core::HasConfig as _;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::HasConfig as _;
 use saladict_core::{Error, Language, RecognizeRequest, Result};
 use saladict_net::NetErr as _;
 use saladict_net::{check, post_with_headers};

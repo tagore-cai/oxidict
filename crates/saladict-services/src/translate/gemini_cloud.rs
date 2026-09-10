@@ -7,11 +7,11 @@
 use crate::Translator;
 use async_trait::async_trait;
 use futures::StreamExt;
+use saladict_core::HasConfig as _;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::HasConfig as _;
 use saladict_core::{Error, Language, Result, TranslateRequest, TranslateResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub struct GeminiCloud;
 
@@ -158,13 +158,12 @@ impl Translator for GeminiCloud {
             let mut s = saladict_net::sse_text(resp);
             while let Some(line) = s.next().await {
                 let line = line?;
-                if let Some(data) = saladict_net::sse_payload(&line) {
-                    if let Ok(v) = serde_json::from_str::<Value>(data) {
-                        if let Some(delta) = extract_content(&v) {
-                            full.push_str(delta);
-                            sink(delta.to_string());
-                        }
-                    }
+                if let Some(data) = saladict_net::sse_payload(&line)
+                    && let Ok(v) = serde_json::from_str::<Value>(data)
+                    && let Some(delta) = extract_content(&v)
+                {
+                    full.push_str(delta);
+                    sink(delta.to_string());
                 }
             }
             return Ok(TranslateResult::Plain(full.trim().to_string()));

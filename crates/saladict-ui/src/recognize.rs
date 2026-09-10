@@ -6,16 +6,16 @@
 //!
 //! 注意：三个薄窗口文件互不引用，各自独立。
 
+use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
+use gpui_kit::component::Root;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::button::ButtonVariants as _;
-use gpui_kit::component::Root;
 use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
-use gpui_kit::AppContext as _;
 use gpui_kit::{
-    div, px, AnyElement, App, Bounds, ClickEvent, ClipboardItem, Context, FontWeight,
-    InteractiveElement, IntoElement, ParentElement, Point, Render, SharedString, Size, Styled,
-    TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions,
+    AnyElement, App, Bounds, ClickEvent, ClipboardItem, Context, FontWeight, InteractiveElement,
+    IntoElement, ParentElement, Point, Render, SharedString, Size, Styled, TitlebarOptions, Window,
+    WindowBounds, WindowKind, WindowOptions, div, px,
 };
 use saladict_core::config::{config, keys};
 use saladict_core::i18n::{t, t_args};

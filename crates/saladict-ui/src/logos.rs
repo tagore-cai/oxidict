@@ -333,10 +333,10 @@ impl Default for CombinedAssets {
 
 impl AssetSource for CombinedAssets {
     fn load(&self, path: &str) -> anyhow::Result<Option<Cow<'static, [u8]>>> {
-        if let Some(rest) = path.strip_prefix("logo/") {
-            if let Some(bytes) = logo_bytes(rest) {
-                return Ok(Some(Cow::Borrowed(bytes)));
-            }
+        if let Some(rest) = path.strip_prefix("logo/")
+            && let Some(bytes) = logo_bytes(rest)
+        {
+            return Ok(Some(Cow::Borrowed(bytes)));
         }
         self.inner.load(path)
     }
@@ -377,7 +377,7 @@ pub fn logo_uri(service_id: &str) -> Option<&'static str> {
 
 #[cfg(test)]
 mod tests {
-    use super::{logo_bytes, logo_uri, LOGO_FILES, SPECIAL};
+    use super::{LOGO_FILES, SPECIAL, logo_bytes, logo_uri};
 
     /// 每个内嵌 logo 都能取到非空字节（include_bytes! 落盘即存在）。
     #[test]

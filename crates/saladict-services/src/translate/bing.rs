@@ -19,8 +19,7 @@ const MS_TRANSLATE_URL: &str =
     "https://edge.microsoft.com/translate/translatetext?isEnterpriseClient=false&";
 
 /// 原 JS 里 `DEFAULT_EDGE_USER_AGENT`。
-const DEFAULT_EDGE_USER_AGENT: &str =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 Edg/113.0.1774.42";
+const DEFAULT_EDGE_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 Edg/113.0.1774.42";
 
 #[async_trait]
 impl Translator for Bing {
@@ -90,16 +89,15 @@ impl Translator for Bing {
         let resp = check(resp).await?;
         let result: Value = resp.json().await.net_err()?;
 
-        if let Some(arr) = result.as_array() {
-            if let Some(text) = arr
+        if let Some(arr) = result.as_array()
+            && let Some(text) = arr
                 .first()
                 .and_then(|v| v.get("translations"))
                 .and_then(|v| v.get(0))
                 .and_then(|v| v.get("text"))
                 .and_then(|v| v.as_str())
-            {
-                return Ok(TranslateResult::Plain(text.trim().to_string()));
-            }
+        {
+            return Ok(TranslateResult::Plain(text.trim().to_string()));
         }
 
         Err(Error::Service(

@@ -5,9 +5,9 @@
 
 use crate::Translator;
 use async_trait::async_trait;
+use saladict_core::HasConfig as _;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::HasConfig as _;
 use saladict_core::{Language, Result, TranslateRequest, TranslateResult};
 use serde_json::Value;
 use urlencoding::encode as url_encode;
