@@ -346,8 +346,8 @@ pub fn toggle_clipboard_monitor() {
     // 生命周期内不回收）；所有调用点（托盘菜单回调、GPUI 命令循环）都在
     // 主线程串行执行，同一时刻不存在其他引用，`&mut` 不构成别名违例。
     let state = unsafe { &mut *ptr };
-    if state.monitor.is_some() {
-        state.monitor.take().unwrap().stop();
+    if let Some(handle) = state.monitor.take() {
+        handle.stop();
         state.clipboard_item.set_checked(false);
         log::info!("{}", t("tray-clipboard-off"));
     } else {

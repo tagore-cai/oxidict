@@ -370,6 +370,9 @@ fn fn_key(n: u32) -> Option<Key> {
 
 #[cfg(test)]
 mod tests {
+    // 测试中 unwrap 直观且失败即测试失败，豁免。
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
 
     #[test]

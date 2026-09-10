@@ -92,7 +92,8 @@ impl Translator for Openai {
         let extra: serde_json::Value = req
             .str("requestArguments")
             .and_then(|s| serde_json::from_str(s).ok())
-            .unwrap_or_else(|| serde_json::from_str(DEFAULT_ARGUMENTS).unwrap());
+            // 不变量：DEFAULT_ARGUMENTS 是内置 JSON 常量，解析不可能失败。
+            .unwrap_or_else(|| serde_json::from_str(DEFAULT_ARGUMENTS).expect("内置 JSON 常量"));
         let body = compat::build_body(&model, stream, &messages, extra);
 
         let headers: Vec<(&str, &str)> = headers.iter().map(|(k, v)| (*k, v.as_str())).collect();

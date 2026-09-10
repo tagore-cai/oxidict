@@ -113,6 +113,9 @@ pub fn start_from_config(ctx: ServerContext) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    // 测试中 unwrap 直观且失败即测试失败，豁免。
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
     use saladict_core::config::ConfigStore;
 

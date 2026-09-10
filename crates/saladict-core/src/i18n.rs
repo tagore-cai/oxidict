@@ -8,7 +8,7 @@
 
 use fluent_templates::{static_loader, Loader};
 use once_cell::sync::Lazy;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 use unic_langid::{langid, LanguageIdentifier};
 
 // 编译期嵌入 locales/<lang>/main.ftl。fallback 为英文。
@@ -51,21 +51,21 @@ static CURRENT: Lazy<Mutex<LanguageIdentifier>> = Lazy::new(|| Mutex::new(langid
 /// 设置当前语言（如 `zh-CN`、`en-US`）。无法解析的值会被忽略。
 pub fn set_language(code: &str) {
     if let Ok(lang) = code.parse::<LanguageIdentifier>() {
-        let mut guard = CURRENT.lock().unwrap();
+        let mut guard = CURRENT.lock();
         *guard = lang;
     }
 }
 
 /// 当前语言代码。
 pub fn language() -> String {
-    CURRENT.lock().unwrap().to_string()
+    CURRENT.lock().to_string()
 }
 
 /// 取一条本地化消息。
 ///
 /// Fluent 的 `lookup` 已内置回退（当前语言 → fallback_language → 键名），无需手动兜底。
 pub fn t(key: &str) -> String {
-    let lang = CURRENT.lock().unwrap().clone();
+    let lang = CURRENT.lock().clone();
     LOCALES.lookup(&lang, key)
 }
 
@@ -77,7 +77,7 @@ pub fn t_args(key: &str, args: &[(&str, &str)]) -> String {
     use std::borrow::Cow;
     use std::collections::HashMap;
 
-    let lang = CURRENT.lock().unwrap().clone();
+    let lang = CURRENT.lock().clone();
     let mut map: HashMap<Cow<'static, str>, FluentValue> = HashMap::new();
     for (name, value) in args {
         map.insert(

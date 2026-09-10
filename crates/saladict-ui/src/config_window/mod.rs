@@ -319,7 +319,8 @@ impl Render for ConfigWindow {
 
         // ── 内容区 ──
         let page_title = if self.nav < 4 {
-            match nav_kind(self.nav).unwrap() {
+            // 不变量：此分支 self.nav < 4，nav_kind 对 0..4 必返回 Some。
+            match nav_kind(self.nav).expect("nav < 4 时必有 ServiceKind") {
                 ServiceKind::Translate => KIND_TABS[0].1,
                 ServiceKind::Recognize => KIND_TABS[1].1,
                 ServiceKind::Tts => KIND_TABS[2].1,

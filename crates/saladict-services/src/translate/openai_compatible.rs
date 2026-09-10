@@ -71,7 +71,11 @@ pub fn build_messages(req: &TranslateRequest, prompts: Value) -> Vec<(String, St
 
     let list = match prompts {
         Value::Array(a) => a,
-        _ => default_prompts().as_array().unwrap().clone(),
+        // 不变量：default_prompts() 返回的内置常量是 JSON Array。
+        _ => default_prompts()
+            .as_array()
+            .expect("内置默认 prompts 是 JSON Array")
+            .clone(),
     };
 
     list.into_iter()

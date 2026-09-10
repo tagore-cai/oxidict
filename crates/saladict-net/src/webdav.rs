@@ -15,11 +15,13 @@ fn dav_url(base: &str, path: &str) -> String {
 }
 
 fn mkcol() -> reqwest::Method {
-    reqwest::Method::from_bytes(b"MKCOL").unwrap()
+    // 不变量："MKCOL" 是合法的 HTTP method 字节序列，from_bytes 不可能失败。
+    reqwest::Method::from_bytes(b"MKCOL").expect("静态合法的 HTTP method")
 }
 
 fn propfind() -> reqwest::Method {
-    reqwest::Method::from_bytes(b"PROPFIND").unwrap()
+    // 不变量："PROPFIND" 是合法的 HTTP method 字节序列。
+    reqwest::Method::from_bytes(b"PROPFIND").expect("静态合法的 HTTP method")
 }
 
 async fn ensure_dir(cfg: &WebDavConfig) {
