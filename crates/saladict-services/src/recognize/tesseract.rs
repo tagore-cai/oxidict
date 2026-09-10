@@ -8,7 +8,7 @@ use crate::Recognizer;
 use async_trait::async_trait;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::{Error, Language, Result, RecognizeRequest};
+use saladict_core::{Error, Language, RecognizeRequest, Result};
 use std::env::temp_dir;
 use std::fs;
 use std::path::PathBuf;
@@ -77,7 +77,7 @@ impl Recognizer for Tesseract {
             .map_err(|e| Error::Service(format!("调用 tesseract 失败，请确认已安装: {e}")))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let _ = fs::remove_file(&output_base.with_extension("txt"));
+            let _ = fs::remove_file(output_base.with_extension("txt"));
             return Err(Error::Service(format!("tesseract 执行失败: {stderr}")));
         }
 

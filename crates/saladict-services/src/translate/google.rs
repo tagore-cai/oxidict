@@ -4,11 +4,11 @@
 //! 这个接口返回的是异构嵌套数组：有 `result[1]` 时是词典模式，否则是纯译文。
 
 use crate::Translator;
-use saladict_core::HasConfig as _;
 use async_trait::async_trait;
 use saladict_core::map_language;
 use saladict_core::model::{DictResult, Explanation, Pronunciation, Sentence};
 use saladict_core::schema::ConfigField;
+use saladict_core::HasConfig as _;
 use saladict_core::{Language, Result, TranslateRequest, TranslateResult};
 use serde_json::Value;
 

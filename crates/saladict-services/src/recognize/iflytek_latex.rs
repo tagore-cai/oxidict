@@ -4,15 +4,15 @@
 //! 走 rest-api.xfyun.cn 的 digest 签名：在 `host date request-line digest` 上做 HMAC-SHA256。
 
 use crate::Recognizer;
-use saladict_core::HasConfig as _;
-use saladict_net::NetErr as _;
 use async_trait::async_trait;
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use chrono::Utc;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::{Error, Language, Result, RecognizeRequest};
+use saladict_core::HasConfig as _;
+use saladict_core::{Error, Language, RecognizeRequest, Result};
+use saladict_net::NetErr as _;
 use saladict_net::{check, hmac_sha256_base64, post_with_headers};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -89,7 +89,9 @@ impl Recognizer for IflytekLatex {
             ],
         )
         .body(payload)
-        .send().await.net_err()?;
+        .send()
+        .await
+        .net_err()?;
         let result: Value = check(resp).await?.json().await.net_err()?;
 
         let regions = result
@@ -100,12 +102,18 @@ impl Recognizer for IflytekLatex {
 
         let mut target = String::new();
         for region in regions {
-            if let Some(content) = region.get("recog").and_then(|r| r.get("content")).and_then(|v| v.as_str()) {
+            if let Some(content) = region
+                .get("recog")
+                .and_then(|r| r.get("content"))
+                .and_then(|v| v.as_str())
+            {
                 target.push_str(content);
                 target.push('\n');
             }
         }
-        let target = target.replace(" ifly-latex-begin ", "").replace(" ifly-latex-end ", "");
+        let target = target
+            .replace(" ifly-latex-begin ", "")
+            .replace(" ifly-latex-end ", "");
         Ok(target.trim().to_string())
     }
 }

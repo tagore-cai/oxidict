@@ -26,12 +26,12 @@ pub fn pack() -> Result<Vec<u8>> {
 
         zip.start_file("config.json", options)
             .map_err(|e| Error::Plugin(format!("zip 写 config.json 失败: {e}")))?;
-        zip.write(&std::fs::read(&config_path)?)?;
+        zip.write_all(&std::fs::read(&config_path)?)?;
 
         if database_path.exists() {
             zip.start_file("history.db", options)
                 .map_err(|e| Error::Plugin(format!("zip 写 history.db 失败: {e}")))?;
-            zip.write(&std::fs::read(&database_path)?)?;
+            zip.write_all(&std::fs::read(&database_path)?)?;
         }
 
         if plugin_path.exists() {
@@ -47,10 +47,11 @@ pub fn pack() -> Result<Vec<u8>> {
                 };
                 zip.start_file(file_name, options)
                     .map_err(|e| Error::Plugin(format!("zip 写 {file_name} 失败: {e}")))?;
-                zip.write(&std::fs::read(path)?)?;
+                zip.write_all(&std::fs::read(path)?)?;
             }
         }
-        zip.finish().map_err(|e| Error::Plugin(format!("zip finish: {e}")))?;
+        zip.finish()
+            .map_err(|e| Error::Plugin(format!("zip finish: {e}")))?;
     }
     Ok(buf.into_inner())
 }
@@ -58,8 +59,8 @@ pub fn pack() -> Result<Vec<u8>> {
 /// 解压 zip 到配置目录（覆盖现有文件）。
 pub fn unpack(data: &[u8]) -> Result<()> {
     let dir = config().app_dir();
-    let mut archive =
-        ZipArchive::new(std::io::Cursor::new(data)).map_err(|e| Error::Plugin(format!("打开备份包失败: {e}")))?;
+    let mut archive = ZipArchive::new(std::io::Cursor::new(data))
+        .map_err(|e| Error::Plugin(format!("打开备份包失败: {e}")))?;
     archive
         .extract(&dir)
         .map_err(|e| Error::Plugin(format!("解压备份失败: {e}")))?;

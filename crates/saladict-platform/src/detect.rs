@@ -66,6 +66,8 @@ fn map(lang: lingua::Language) -> Language {
         lingua::Language::Nynorsk => Language::NnNo,
         lingua::Language::Bokmal => Language::NbNo,
         lingua::Language::Ukrainian => Language::Uk,
-        _ => Language::En,
+        // 没有兜底分支：lingua 关掉了默认 feature，`Language` 只包含上面
+        // 这些启用的语种，匹配已穷尽。日后新增语种会直接编译失败，
+        // 提醒同步维护这里的映射，而不是悄悄回落到英语。
     }
 }

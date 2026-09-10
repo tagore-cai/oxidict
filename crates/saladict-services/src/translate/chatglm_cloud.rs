@@ -5,11 +5,11 @@
 //! SSE 增量字段为 `choices[0].delta.content`。
 
 use crate::Translator;
-use saladict_core::HasConfig as _;
 use async_trait::async_trait;
 use futures::StreamExt;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
+use saladict_core::HasConfig as _;
 use saladict_core::{Error, Language, Result, TranslateRequest, TranslateResult};
 use serde_json::{json, Value};
 
@@ -22,10 +22,7 @@ const DEFAULT_TEMP: f64 = 0.1;
 
 const SYSTEM_PROMPT: &str = "You are a professional translation engine, please translate the text into a colloquial, professional, elegant and fluent content, without the style of machine translation. You must only translate the text content, never interpret it.";
 
-const MODELS: &[(&str, &str)] = &[
-    ("glm-4.5-flash", "glm-4.5-flash"),
-    ("glm-4.6", "glm-4.6"),
-];
+const MODELS: &[(&str, &str)] = &[("glm-4.5-flash", "glm-4.5-flash"), ("glm-4.6", "glm-4.6")];
 
 /// 从一条 OpenAI 兼容的 chunk 里取出增量文本：先试 `delta.content`（流式），再试 `message.content`（非流式）。
 fn extract_content(v: &Value) -> Option<&str> {
@@ -128,10 +125,7 @@ impl Translator for ChatglmCloud {
             .unwrap_or(DEFAULT_TEMP);
 
         let to_lang = self.map_language(req.to);
-        let user_content = format!(
-            "Translate into {}:\n\"\"\"\n{}\n\"\"\"",
-            to_lang, req.text
-        );
+        let user_content = format!("Translate into {}:\n\"\"\"\n{}\n\"\"\"", to_lang, req.text);
         let messages = json!([
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
@@ -152,10 +146,7 @@ impl Translator for ChatglmCloud {
         ];
 
         let rb = saladict_net::post_with_headers(url, &headers).json(&body);
-        let resp = rb
-            .send()
-            .await
-            .map_err(|e| Error::Network(e.to_string()))?;
+        let resp = rb.send().await.map_err(|e| Error::Network(e.to_string()))?;
         let resp = saladict_net::check(resp).await?;
 
         // 流式：边解析 SSE 增量边推送。

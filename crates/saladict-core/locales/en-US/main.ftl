@@ -54,7 +54,8 @@ config-move-down = Move down
 config-field-required = { $field } is required
 config-field-unknown = Field
 
-config-hotkey-hint = Global hotkeys (e.g. Command+T / Ctrl+Alt+X; leave empty to disable; save to apply)
+config-hotkey-hint = Global hotkeys (e.g. Command+T / Ctrl+Alt+X; leave empty to disable; applied on record, Backspace clears and unregisters)
+config-hotkey-conflict = Hotkey conflict: this combo is already bound to "{ $name }"
 config-hotkey-selection = Selection translate
 config-hotkey-input = Input translate
 config-hotkey-ocr = Screenshot OCR
@@ -62,6 +63,14 @@ config-hotkey-ocr-translate = Screenshot translate
 
 config-clipboard-monitor = Monitor clipboard
 config-dark-mode = Dark mode
+config-transparent = Window translucency (new windows)
+config-dock-icon = Hide Dock icon (macOS)
+config-server-port = Server port (restart to apply)
+config-dev-mode = Developer mode
+config-nav-history = History
+config-history-count = { $count } entries
+config-history-empty = No translation history yet
+config-history-clear = Clear history
 config-proxy = HTTP proxy
 config-proxy-host = Proxy host
 config-proxy-port = Proxy port
@@ -95,6 +104,8 @@ tray-clipboard-captured = Clipboard captured: { $count } chars
 tray-clipboard-on = Clipboard monitor started
 tray-error-icon-gen = Icon generation failed: { $err }
 notify-error-open = Failed to open notify window
+notify-copied = Copied to clipboard
+notify-hidden = Translate window hidden
 updater-error-no-version = Failed to get version info
 updater-latest-version = Latest version: { $version }
 updater-hint = Click "Check for updates" to see if there's a new version
@@ -121,3 +132,13 @@ config-backup-saved = Saved
 config-proxy-username = Proxy username
 config-proxy-password = Proxy password
 config-no-proxy = Bypass proxy for
+
+## 托盘补充
+tray-auto-copy = Auto Copy
+tray-copy-source = Source
+tray-copy-target = Target
+tray-copy-source-target = Source+Target
+tray-copy-disable = Disable
+tray-check-update = Check Update
+tray-view-log = View Log
+tray-restart = Restart

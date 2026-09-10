@@ -9,7 +9,7 @@
 use crate::Recognizer;
 use async_trait::async_trait;
 use saladict_core::schema::ConfigField;
-use saladict_core::{Error, Language, Result, RecognizeRequest};
+use saladict_core::{Error, Language, RecognizeRequest, Result};
 use saladict_platform::ocr::system_ocr;
 
 pub struct System;
@@ -26,8 +26,8 @@ impl Recognizer for System {
     }
 
     async fn recognize(&self, req: RecognizeRequest) -> Result<String> {
-        let mut result = system_ocr(&req.image, req.language)
-            .map_err(|e| Error::Platform(e.to_string()))?;
+        let mut result =
+            system_ocr(&req.image, req.language).map_err(|e| Error::Platform(e.to_string()))?;
 
         // 与原文一致：中文（及 Windows 上的日文）结果去掉空格，避免逐字间隔。
         if req.language == Language::ZhCn || req.language == Language::ZhTw {

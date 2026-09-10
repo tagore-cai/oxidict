@@ -4,15 +4,15 @@
 //! 走讯飞特有签名：对 `host/date/request-line` 做 HMAC-SHA256，base64 后放入 Authorization。
 
 use crate::Recognizer;
-use saladict_core::HasConfig as _;
-use saladict_net::NetErr as _;
 use async_trait::async_trait;
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use chrono::Utc;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::{Error, Language, Result, RecognizeRequest};
+use saladict_core::HasConfig as _;
+use saladict_core::{Error, Language, RecognizeRequest, Result};
+use saladict_net::NetErr as _;
 use saladict_net::{check, hmac_sha256_base64, percent_encode, post_with_headers};
 use serde_json::Value;
 
@@ -23,7 +23,13 @@ const PATH: &str = "/v1/private/sf8e6aca1";
 const SERVICE: &str = "sf8e6aca1";
 
 /// 讯飞 HMAC-SHA256 请求头签名，等价于 JS `iflytek_auth`。
-fn iflytek_auth(api_key: &str, api_secret: &str, host: &str, date: &str, request_line: &str) -> String {
+fn iflytek_auth(
+    api_key: &str,
+    api_secret: &str,
+    host: &str,
+    date: &str,
+    request_line: &str,
+) -> String {
     let signature_origin = format!("host: {}\ndate: {}\n{}", host, date, request_line);
     let signature = hmac_sha256_base64(api_secret.as_bytes(), &signature_origin);
     let authorization_origin = format!(
@@ -92,7 +98,9 @@ impl Recognizer for Iflytek {
 
         let resp = post_with_headers(&url, &[("content-type", "application/json")])
             .body(payload)
-            .send().await.net_err()?;
+            .send()
+            .await
+            .net_err()?;
         let data: Value = check(resp).await?.json().await.net_err()?;
 
         // 响应 payload 内 result.text 为 base64，解码后是 JSON 的 pages/lines/words。
@@ -103,7 +111,11 @@ impl Recognizer for Iflytek {
             .and_then(|r| r.get("text"))
             .and_then(|t| t.as_str())
             .ok_or_else(|| Error::Service("Result payload not found".into()))?;
-        let text_string = String::from_utf8_lossy(&B64.decode(text_b64).map_err(|e| Error::Service(format!("base64 解码失败: {e}")))?).to_string();
+        let text_string = String::from_utf8_lossy(
+            &B64.decode(text_b64)
+                .map_err(|e| Error::Service(format!("base64 解码失败: {e}")))?,
+        )
+        .to_string();
         let text_json: Value = serde_json::from_str(&text_string)
             .map_err(|e| Error::Service(format!("解析识别结果失败: {e}")))?;
 
@@ -114,7 +126,8 @@ impl Recognizer for Iflytek {
                     for line in lines {
                         if let Some(words) = line.get("words").and_then(|v| v.as_array()) {
                             for word in words {
-                                if let Some(content) = word.get("content").and_then(|v| v.as_str()) {
+                                if let Some(content) = word.get("content").and_then(|v| v.as_str())
+                                {
                                     out.push_str(content);
                                     out.push(' ');
                                 }

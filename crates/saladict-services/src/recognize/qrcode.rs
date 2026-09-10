@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use image::DynamicImage;
 use rqrr::PreparedImage;
 use saladict_core::schema::ConfigField;
-use saladict_core::{Error, Result, RecognizeRequest};
+use saladict_core::{Error, RecognizeRequest, Result};
 
 pub struct Qrcode;
 

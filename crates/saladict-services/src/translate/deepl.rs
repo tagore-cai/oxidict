@@ -25,7 +25,11 @@ impl Translator for DeepL {
             ConfigField::Select {
                 key: "type",
                 label: "接口类型",
-                options: &[("free", "免费接口"), ("api", "API Key"), ("deeplx", "DeepLX")],
+                options: &[
+                    ("free", "免费接口"),
+                    ("api", "API Key"),
+                    ("deeplx", "DeepLX"),
+                ],
                 default: "free",
             },
             ConfigField::Text {
@@ -130,7 +134,7 @@ async fn translate_by_free(text: &str, from: &str, to: &str) -> Result<Translate
 
     // 原实现的字符级混淆：按随机数决定 method 字段后的空格形态。
     let mut body_str = serde_json::to_string(&body)?;
-    if (rand + 5) % 29 == 0 || (rand + 3) % 13 == 0 {
+    if (rand + 5).is_multiple_of(29) || (rand + 3).is_multiple_of(13) {
         body_str = body_str.replace(r#""method":""#, r#""method" : ""#);
     } else {
         body_str = body_str.replace(r#""method":""#, r#""method": ""#);
@@ -154,7 +158,12 @@ async fn translate_by_free(text: &str, from: &str, to: &str) -> Result<Translate
     Ok(TranslateResult::Plain(translated))
 }
 
-async fn translate_by_deeplx(text: &str, from: &str, to: &str, url: &str) -> Result<TranslateResult> {
+async fn translate_by_deeplx(
+    text: &str,
+    from: &str,
+    to: &str,
+    url: &str,
+) -> Result<TranslateResult> {
     let body = json!({
         "source_lang": from,
         "target_lang": to,

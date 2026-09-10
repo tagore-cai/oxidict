@@ -76,14 +76,10 @@ pub fn register(name: &str, accelerator: &str, handler: Arc<dyn Fn() + Send + Sy
         return;
     };
 
-    REGISTRY.bindings.lock().insert(
-        name.to_string(),
-        Binding {
-            mods,
-            key,
-            handler,
-        },
-    );
+    REGISTRY
+        .bindings
+        .lock()
+        .insert(name.to_string(), Binding { mods, key, handler });
     log::info!("已注册快捷键 {accelerator} -> {name}");
 
     // Tap 只创建一次；失败时重置标志，允许用户授权后通过重新注册重试。
@@ -95,6 +91,20 @@ pub fn register(name: &str, accelerator: &str, handler: Arc<dyn Fn() + Send + Sy
 /// 注销快捷键。
 pub fn unregister(name: &str) {
     REGISTRY.bindings.lock().remove(name);
+}
+
+/// 查找与 `accelerator` 完全相同（解析后修饰键集合与触发键一致）、且绑定名
+/// 不是 `expect_name` 的已注册绑定。
+///
+/// 用于设置页录入时的冲突检测：触发匹配是超集语义（少按修饰键也能触发），
+/// 但「绑定了同一个组合键」的判定用精确匹配——这正是用户直觉上的冲突。
+pub fn find_conflict(accelerator: &str, expect_name: &str) -> Option<String> {
+    let (mods, key) = parse(accelerator)?;
+    let bindings = REGISTRY.bindings.lock();
+    bindings
+        .iter()
+        .find(|(name, b)| name.as_str() != expect_name && b.key == key && b.mods == mods)
+        .map(|(name, _)| name.clone())
 }
 
 fn start_event_loop() {
@@ -238,8 +248,37 @@ fn parse_key(name: &str) -> Option<Key> {
         "down" => Some(Key::ArrowDown),
         "left" => Some(Key::ArrowLeft),
         "right" => Some(Key::ArrowRight),
-        "minus" => Some(Key::Minus),
-        "equal" => Some(Key::Equal),
+        // 标点：既接受符号本身（对齐原版 keyMap 产出的配置写法，如 `Ctrl+,`），
+        // 也接受长名。
+        "`" | "backtick" => Some(Key::Backtick),
+        "-" | "minus" => Some(Key::Minus),
+        "=" | "equal" => Some(Key::Equal),
+        "[" | "bracketleft" => Some(Key::BracketLeft),
+        "]" | "bracketright" => Some(Key::BracketRight),
+        "\\" | "backslash" => Some(Key::Backslash),
+        ";" | "semicolon" => Some(Key::Semicolon),
+        "'" | "quote" => Some(Key::Quote),
+        "," | "comma" => Some(Key::Comma),
+        "." | "period" => Some(Key::Period),
+        "/" | "slash" => Some(Key::Slash),
+        // 小键盘（原版 keyMap 产出为 `Num0`..`Num9`，不区分大小写）。
+        "num0" => Some(Key::Numpad0),
+        "num1" => Some(Key::Numpad1),
+        "num2" => Some(Key::Numpad2),
+        "num3" => Some(Key::Numpad3),
+        "num4" => Some(Key::Numpad4),
+        "num5" => Some(Key::Numpad5),
+        "num6" => Some(Key::Numpad6),
+        "num7" => Some(Key::Numpad7),
+        "num8" => Some(Key::Numpad8),
+        "num9" => Some(Key::Numpad9),
+        // 导航与编辑键（原版产出 Pageup/Pagedown/Capslock 等，不区分大小写）。
+        "home" => Some(Key::Home),
+        "end" => Some(Key::End),
+        "pageup" => Some(Key::PageUp),
+        "pagedown" => Some(Key::PageDown),
+        "insert" => Some(Key::Insert),
+        "capslock" => Some(Key::CapsLock),
         name if name.starts_with('f') => {
             let n: u32 = name[1..].parse().ok()?;
             if !(1..=24).contains(&n) {
@@ -327,4 +366,24 @@ fn fn_key(n: u32) -> Option<Key> {
         24 => Key::F24,
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_punctuation_and_numpad() {
+        let (mods, key) = parse("Ctrl+,").unwrap();
+        assert!(mods.contains(&Mod::Control));
+        assert_eq!(key, Key::Comma);
+        // 原版 keyMap 产出 `Num1`..`Num9`，不区分大小写。
+        assert_eq!(parse("Ctrl+Num1").unwrap().1, Key::Numpad1);
+        assert_eq!(parse("Alt+`").unwrap().1, Key::Backtick);
+        assert_eq!(parse("Ctrl+PageUp").unwrap().1, Key::PageUp);
+        assert_eq!(parse("Ctrl+CapsLock").unwrap().1, Key::CapsLock);
+        // 缺触发键 / 未知键。
+        assert!(parse("Ctrl+").is_none());
+        assert!(parse("Ctrl+%%").is_none());
+    }
 }

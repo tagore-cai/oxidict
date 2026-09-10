@@ -4,14 +4,14 @@
 //! 签名用 `saladict_net::sign::tc3_sign`（TC3-HMAC-SHA256 链式派生）。
 
 use crate::Recognizer;
-use saladict_core::HasConfig as _;
-use saladict_net::NetErr as _;
-use base64::Engine as _;
 use async_trait::async_trait;
+use base64::Engine as _;
 use chrono::Utc;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::{Error, Language, Result, RecognizeRequest};
+use saladict_core::HasConfig as _;
+use saladict_core::{Error, Language, RecognizeRequest, Result};
+use saladict_net::NetErr as _;
 use saladict_net::{check, post_with_headers, sha256_hex, tc3_sign};
 use serde_json::Value;
 
@@ -80,10 +80,16 @@ impl Recognizer for Tencent {
         );
         let credential_scope = format!("{}/{}/tc3_request", date, SERVICE);
         let string_to_sign_prefix = format!("TC3-HMAC-SHA256\n{}\n{}", timestamp, credential_scope);
-        let signature = tc3_sign(&secret_key, &date, SERVICE, &canonical_request, &string_to_sign_prefix);
+        let signature = tc3_sign(
+            &secret_key,
+            &date,
+            SERVICE,
+            &canonical_request,
+            &string_to_sign_prefix,
+        );
         let authorization = format!(
-            "TC3-HMAC-SHA256 Credential={}/{}{}, SignedHeaders=content-type;host, Signature={}",
-            secret_id, date, format!("/{}/tc3_request", SERVICE), signature
+            "TC3-HMAC-SHA256 Credential={}/{}/tc3_request, SignedHeaders=content-type;host, Signature={}",
+            secret_id, date, signature
         );
 
         let resp = post_with_headers(
@@ -99,7 +105,9 @@ impl Recognizer for Tencent {
             ],
         )
         .body(payload)
-        .send().await.net_err()?;
+        .send()
+        .await
+        .net_err()?;
         let result: Value = check(resp).await?.json().await.net_err()?;
 
         let detections = result

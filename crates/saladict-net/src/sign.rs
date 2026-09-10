@@ -16,22 +16,19 @@ fn b64(bytes: &[u8]) -> String {
 }
 
 pub fn hmac_sha1_base64(key: &[u8], msg: &str) -> String {
-    let mut mac =
-        HmacSha1::new_from_slice(key).expect("HMAC-SHA1 accepts any key length");
+    let mut mac = HmacSha1::new_from_slice(key).expect("HMAC-SHA1 accepts any key length");
     mac.update(msg.as_bytes());
     b64(&mac.finalize().into_bytes())
 }
 
 pub fn hmac_sha256_base64(key: &[u8], msg: &str) -> String {
-    let mut mac =
-        HmacSha256::new_from_slice(key).expect("HMAC-SHA256 accepts any key length");
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC-SHA256 accepts any key length");
     mac.update(msg.as_bytes());
     b64(&mac.finalize().into_bytes())
 }
 
 pub fn hmac_sha256_hex(key: &[u8], msg: &str) -> String {
-    let mut mac =
-        HmacSha256::new_from_slice(key).expect("HMAC-SHA256 accepts any key length");
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC-SHA256 accepts any key length");
     mac.update(msg.as_bytes());
     hex::encode(mac.finalize().into_bytes())
 }
@@ -138,6 +135,9 @@ pub struct AwsSignature {
     pub x_date: String,
 }
 
+/// 参数个数由 AWS SigV4 算法本身决定（方法/主机/路径/查询/头/载荷/密钥对/
+/// 区域/服务），拆成 builder 反而会把调用方搞复杂，这里保留平直签名。
+#[allow(clippy::too_many_arguments)]
 pub fn aws_sign(
     method: &str,
     host: &str,
@@ -156,11 +156,7 @@ pub fn aws_sign(
     let mut signed: Vec<(&str, &str)> = headers.to_vec();
     signed.push(("x-date", x_date.as_str()));
     signed.sort_by(|a, b| a.0.cmp(b.0));
-    let signed_headers = signed
-        .iter()
-        .map(|(k, _)| *k)
-        .collect::<Vec<_>>()
-        .join(";");
+    let signed_headers = signed.iter().map(|(k, _)| *k).collect::<Vec<_>>().join(";");
 
     let canonical_headers = signed
         .iter()
@@ -171,12 +167,7 @@ pub fn aws_sign(
 
     let canonical_request = format!(
         "{}\n{}\n{}\n{}\n{}\n{}",
-        method,
-        path,
-        query,
-        canonical_headers,
-        signed_headers,
-        payload_hash
+        method, path, query, canonical_headers, signed_headers, payload_hash
     );
 
     let scope = format!("{}/{}/{}/request", short_date, region, service);
@@ -215,10 +206,7 @@ pub fn tc3_sign(
         string_to_sign_prefix,
         sha256_hex(canonical_request.as_bytes())
     );
-    hex::encode(hmac_sha256_raw(
-        &secret_signing,
-        string_to_sign.as_bytes(),
-    ))
+    hex::encode(hmac_sha256_raw(&secret_signing, string_to_sign.as_bytes()))
 }
 
 #[cfg(test)]
@@ -231,7 +219,10 @@ mod tests {
         // RFC 2202 Test Case 1: key = 0x0b*20, data = "Hi There"
         let key = [0x0bu8; 20];
         // 经 Python hmac/hashlib 权威验证的值（RFC 2202 TC1）。
-        assert_eq!(hmac_sha1_base64(&key, "Hi There"), "thcxhlUFcmTii8C2+zeMjvFGvgA=");
+        assert_eq!(
+            hmac_sha1_base64(&key, "Hi There"),
+            "thcxhlUFcmTii8C2+zeMjvFGvgA="
+        );
     }
 
     #[test]
@@ -267,10 +258,21 @@ mod tests {
     fn aws_sign_produces_expected_structure() {
         // 结构校验：signature 为 64 位 hex，signed_headers 按字母序。
         let sig = aws_sign(
-            "POST", "open.volcengineapi.com", "/", "Action=TranslateText&Version=2020-06-01",
-            &[("content-type", "application/json"), ("host", "open.volcengineapi.com"),
-              ("x-content-sha256", "abc"), ("x-date", "20240101T120000Z")],
-            b"{}", "ak", "sk", "cn-north-1", "translate",
+            "POST",
+            "open.volcengineapi.com",
+            "/",
+            "Action=TranslateText&Version=2020-06-01",
+            &[
+                ("content-type", "application/json"),
+                ("host", "open.volcengineapi.com"),
+                ("x-content-sha256", "abc"),
+                ("x-date", "20240101T120000Z"),
+            ],
+            b"{}",
+            "ak",
+            "sk",
+            "cn-north-1",
+            "translate",
         );
         assert_eq!(sig.signature.len(), 64);
         assert!(sig.signed_headers.starts_with("content-type;"));
@@ -279,8 +281,20 @@ mod tests {
 
     #[test]
     fn tc3_sign_is_deterministic() {
-        let a = tc3_sign("sk", "2024-01-01", "tmt", "canonical", "TC3-HMAC-SHA256\n1\nscope");
-        let b = tc3_sign("sk", "2024-01-01", "tmt", "canonical", "TC3-HMAC-SHA256\n1\nscope");
+        let a = tc3_sign(
+            "sk",
+            "2024-01-01",
+            "tmt",
+            "canonical",
+            "TC3-HMAC-SHA256\n1\nscope",
+        );
+        let b = tc3_sign(
+            "sk",
+            "2024-01-01",
+            "tmt",
+            "canonical",
+            "TC3-HMAC-SHA256\n1\nscope",
+        );
         assert_eq!(a, b);
         assert_eq!(a.len(), 64);
     }

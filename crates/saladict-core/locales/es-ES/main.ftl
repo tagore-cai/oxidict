@@ -55,6 +55,8 @@ config-saved-hint = Saved (some settings take effect after restart)
 config-title = Preferences
 important-notice = Important notice
 notify-error-open = Failed to open notify window
+notify-copied = Copiado al portapapeles
+notify-hidden = Ventana de traducción oculta
 recognize-action = Recognize
 recognize-copy = Copy result
 recognize-image-bytes = Image { $bytes } bytes
@@ -96,3 +98,13 @@ updater-hint = Click "Check for updates" to see if there's a new version
 updater-latest-version = ## La última versión está instalada
 updater-title = Comprobar actualizaciones
 updater-window-title = Saladict · Update
+
+## 托盘补充
+tray-auto-copy = Copiar automáticamente
+tray-copy-source = Fuente
+tray-copy-target = Destino
+tray-copy-source-target = Fuente+Destino
+tray-copy-disable = Desactivar
+tray-check-update = Buscar actualizaciones
+tray-view-log = Ver registro
+tray-restart = Reiniciar

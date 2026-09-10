@@ -57,8 +57,7 @@ pub fn enable() -> Result<()> {
 
 /// 禁用开机自启。
 pub fn disable() -> Result<()> {
-    let plist = plist_path()
-        .ok_or_else(|| Error::Config("无法定位 LaunchAgents 目录".into()))?;
+    let plist = plist_path().ok_or_else(|| Error::Config("无法定位 LaunchAgents 目录".into()))?;
     if plist.exists() {
         std::fs::remove_file(&plist)?;
     }

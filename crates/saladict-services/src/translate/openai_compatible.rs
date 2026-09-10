@@ -5,9 +5,8 @@
 //! 可选流式输出、响应解析。差异只在端点地址与鉴权头。
 
 use saladict_core::{Error, Language, Result, StreamSink, TranslateRequest, TranslateResult};
-use saladict_core::HasConfig as _;
-use serde_json::{json, Value};
 use saladict_net::NetErr as _;
+use serde_json::{json, Value};
 
 /// LLM 提示词里的语言用完整英文名，翻译质量比语言码好。
 pub fn language_display(lang: Language) -> &'static str {
@@ -186,11 +185,6 @@ pub fn prompts_from(req: &TranslateRequest) -> Value {
         .unwrap_or_else(default_prompts)
 }
 
-/// 读取请求地址；缺失时报配置错误。
-pub fn request_path(req: &TranslateRequest, key: &str) -> Result<String> {
-    req.require_str(key, "请求地址")
-}
-
 /// Ollama 走原生 /api/chat 协议，响应结构与 OpenAI 不同，单独解析。
 pub async fn ollama_chat(url: &str, body: Value) -> Result<TranslateResult> {
     let resp = saladict_net::post_json_value(url, &body).await?;
@@ -201,29 +195,4 @@ pub async fn ollama_chat(url: &str, body: Value) -> Result<TranslateResult> {
         .unwrap_or_default()
         .to_string();
     Ok(TranslateResult::Plain(content.trim().to_string()))
-}
-
-/// 实现 Translator 的通用骨架：各家只提供端点、鉴权头与请求体差异。
-pub struct CompatConfig {
-    pub url: String,
-    pub headers: Vec<(&'static str, String)>,
-    pub body: Value,
-    pub stream: bool,
-}
-
-pub fn borrow_headers<'a>(headers: &'a [(&'static str, String)]) -> Vec<(&'a str, &'a str)> {
-    headers.iter().map(|(k, v)| (*k, v.as_str())).collect()
-}
-
-/// 把 `Completions` 风格调用封装成可直接在 translate() 里使用的函数。
-pub async fn run_chat(req: &TranslateRequest, cfg: CompatConfig) -> Result<TranslateResult> {
-    let headers = borrow_headers(&cfg.headers);
-    chat_completions(
-        &cfg.url,
-        &headers,
-        cfg.body,
-        cfg.stream,
-        req.on_stream.as_ref(),
-    )
-    .await
 }

@@ -4,13 +4,13 @@
 //! 与 `baidu` 流程一致，仅识别接口为 `accurate_basic`，且 language_type 支持 `auto_detect`。
 
 use crate::Recognizer;
-use saladict_core::HasConfig as _;
-use saladict_net::NetErr as _;
-use base64::Engine as _;
 use async_trait::async_trait;
+use base64::Engine as _;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::{Error, Language, Result, RecognizeRequest};
+use saladict_core::HasConfig as _;
+use saladict_core::{Error, Language, RecognizeRequest, Result};
+use saladict_net::NetErr as _;
 use saladict_net::{check, post_with_headers};
 use serde_json::Value;
 
@@ -73,7 +73,9 @@ impl Recognizer for BaiduAccurate {
             ("client_id", client_id.as_str()),
             ("client_secret", client_secret.as_str()),
         ])
-        .send().await.net_err()?;
+        .send()
+        .await
+        .net_err()?;
         let token_val: Value = check(token_resp).await?.json().await.net_err()?;
         let token = token_val
             .get("access_token")
@@ -92,15 +94,15 @@ impl Recognizer for BaiduAccurate {
             ("detect_direction", "false"),
             ("image", b64.as_str()),
         ])
-        .send().await.net_err()?;
+        .send()
+        .await
+        .net_err()?;
         let result: Value = check(resp).await?.json().await.net_err()?;
 
         let words = result
             .get("words_result")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| {
-                Error::Service(serde_json::to_string(&result).unwrap_or_default())
-            })?;
+            .ok_or_else(|| Error::Service(serde_json::to_string(&result).unwrap_or_default()))?;
 
         let mut target = String::new();
         for item in words {

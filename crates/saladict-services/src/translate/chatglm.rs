@@ -4,17 +4,16 @@
 //! 鉴权用的是 HS256 JWT（jose 库），这里用 `hmac_sha256_raw` + base64url 手搓；
 //! 支持流式（SSE）与非流式两种模式，流式时通过 `req.on_stream` 增量回传。
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use saladict_core::HasConfig as _;
-use saladict_net::NetErr as _;
-use base64::Engine as _;
-use base64::Engine;
 use crate::Translator;
 use async_trait::async_trait;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine as _;
 use futures::StreamExt;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
+use saladict_core::HasConfig as _;
 use saladict_core::{Error, Language, Result, TranslateRequest, TranslateResult};
+use saladict_net::NetErr as _;
 use saladict_net::{check, hmac_sha256_raw, post_with_headers, sse_payload, sse_text};
 use serde_json::{json, Value};
 

@@ -2,12 +2,12 @@
 
 use saladict_core::{Language, Result};
 
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
-#[cfg(target_os = "linux")]
-mod linux;
 
 /// 对 `image`（PNG/JPEG 等编码字节）做系统 OCR，返回识别出的文本。
 ///

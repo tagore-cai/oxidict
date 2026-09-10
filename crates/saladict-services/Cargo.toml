@@ -32,3 +32,6 @@ urlencoding.workspace = true
 tokio.workspace = true
 futures.workspace = true
 log.workspace = true
+
+[lints]
+workspace = true

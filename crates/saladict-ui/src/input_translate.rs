@@ -5,19 +5,17 @@
 
 use gpui_kit::base::{h_flex, v_flex};
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::input::{InputEvent, InputState, Input};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::spinner::Spinner;
-use gpui_kit::component::{ActiveTheme, IconName, Sizable};
-use gpui_kit::{
-    div, px, App, Bounds, Context, Entity, IntoElement, InteractiveElement, ParentElement,
-    Point, Render, SharedString, Size, Styled, TitlebarOptions, Window, WindowBounds,
-    WindowKind, WindowOptions,
-};
-use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::component::{ActiveTheme, Sizable};
 use gpui_kit::AppContext as _;
+use gpui_kit::{
+    div, px, App, Bounds, Context, Entity, IntoElement, ParentElement, Point, Render, SharedString,
+    Size, Styled, TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions,
+};
 use saladict_core::config::config;
-use saladict_core::i18n::{t, t_args};
-use saladict_core::{Language, TranslateRequest, TranslateResult};
+use saladict_core::i18n::t;
+use saladict_core::TranslateRequest;
 use saladict_services::spawn_translate;
 use std::sync::Arc;
 
@@ -35,12 +33,11 @@ pub struct InputTranslateWindow {
 
 impl InputTranslateWindow {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let source = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(t("translate-source-placeholder"))
-        });
+        let source =
+            cx.new(|cx| InputState::new(window, cx).placeholder(t("translate-source-placeholder")));
 
         // Enter 翻译。
-        cx.subscribe_in(&source, window, |this, _, event, window, cx| {
+        cx.subscribe_in(&source, window, |this, _, event, _window, cx| {
             if let InputEvent::PressEnter { .. } = event {
                 let text = this.source.read(cx).value().trim().to_string();
                 if !text.is_empty() {
@@ -103,7 +100,12 @@ impl InputTranslateWindow {
         .detach();
     }
 
-    fn do_translate_click(&mut self, _: &gpui_kit::ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
+    fn do_translate_click(
+        &mut self,
+        _: &gpui_kit::ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let text = self.source.read(cx).value().trim().to_string();
         if !text.is_empty() {
             self.do_translate(text, cx);
@@ -167,8 +169,14 @@ impl Render for InputTranslateWindow {
 pub fn open_input_translate(cx: &mut App) {
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds {
-            origin: Point { x: px(880.0), y: px(420.0) },
-            size: Size { width: px(320.0), height: px(180.0) },
+            origin: Point {
+                x: px(880.0),
+                y: px(420.0),
+            },
+            size: Size {
+                width: px(320.0),
+                height: px(180.0),
+            },
         })),
         titlebar: Some(TitlebarOptions {
             title: Some(t("translate-title").into()),

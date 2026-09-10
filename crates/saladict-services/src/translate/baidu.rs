@@ -4,10 +4,10 @@
 //! 签名 = md5(appid + text + salt + secret)，请求以 GET + query 形式发送。
 
 use crate::Translator;
-use saladict_core::HasConfig as _;
 use async_trait::async_trait;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
+use saladict_core::HasConfig as _;
 use saladict_core::{Error, Language, Result, TranslateRequest, TranslateResult};
 use saladict_net::{get_value, md5_hex, uuid_v4};
 use serde_json::Value;

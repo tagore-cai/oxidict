@@ -72,11 +72,14 @@ impl Translator for Tencent {
             "POST\n/\n\ncontent-type:application/json\nhost:{ENDPOINT}\n\ncontent-type;host\n{payload_hash}"
         );
 
-        let string_to_sign_prefix = format!(
-            "TC3-HMAC-SHA256\n{timestamp}\n{date}/tmt/tc3_request"
+        let string_to_sign_prefix = format!("TC3-HMAC-SHA256\n{timestamp}\n{date}/tmt/tc3_request");
+        let signature = saladict_net::tc3_sign(
+            &secret_key,
+            &date,
+            "tmt",
+            &canonical_request,
+            &string_to_sign_prefix,
         );
-        let signature =
-            saladict_net::tc3_sign(&secret_key, &date, "tmt", &canonical_request, &string_to_sign_prefix);
         let credential_scope = format!("{date}/tmt/tc3_request");
         let authorization = format!(
             "TC3-HMAC-SHA256 Credential={secret_id}/{credential_scope}, \

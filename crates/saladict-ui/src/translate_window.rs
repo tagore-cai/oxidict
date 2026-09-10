@@ -4,25 +4,47 @@
 //! 结果卡片（加载/结果/错误三态），以及复制、交换语言等操作。
 //! 布局与原版一致：标题栏 -> 语言行 -> 源文本 -> 操作行 -> 结果卡片列表。
 
+use gpui_kit::base::IndexPath;
 use gpui_kit::base::{h_flex, v_flex};
-use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::button::Button;
+use gpui_kit::component::button::ButtonVariants as _;
 use gpui_kit::component::input::{InputEvent, Textarea, TextareaState};
 use gpui_kit::component::select::{Select, SelectState};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
-use gpui_kit::component::button::ButtonVariants as _;
-use gpui_kit::base::IndexPath;
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    div, px, relative, AnyElement, ClickEvent, ClipboardItem, Context, Entity, FontWeight,
-    IntoElement, InteractiveElement, StatefulInteractiveElement, AppContext, ParentElement,
-    Render, ScrollHandle,
-    SharedString, Styled, Window,
+    div, img, px, relative, AnyElement, AppContext, ClickEvent, ClipboardItem, Context, Entity,
+    FontWeight, InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle, SharedString,
+    StatefulInteractiveElement, Styled, Window,
 };
-use std::sync::Arc;
-use saladict_core::config::config;
+use saladict_core::config::{config, keys, parse_instance};
 use saladict_core::i18n::{t, t_args};
 use saladict_core::{Language, TranslateRequest, TranslateResult};
 use saladict_services::{instance_display_name, spawn_translate};
+use std::sync::Arc;
+
+/// 把当前窗口几何写回 config（`translate_remember_window_size`）。
+fn persist_window_bounds(window: &Window) {
+    let b = window.bounds();
+    let store = config();
+    let _ = store.set(
+        saladict_core::config::keys::TRANSLATE_WINDOW_WIDTH,
+        &b.size.width.as_f32(),
+    );
+    let _ = store.set(
+        saladict_core::config::keys::TRANSLATE_WINDOW_HEIGHT,
+        &b.size.height.as_f32(),
+    );
+    let _ = store.set(
+        saladict_core::config::keys::TRANSLATE_WINDOW_POSITION_X,
+        &b.origin.x.as_f32(),
+    );
+    let _ = store.set(
+        saladict_core::config::keys::TRANSLATE_WINDOW_POSITION_Y,
+        &b.origin.y.as_f32(),
+    );
+}
 
 /// 一个结果卡片的渲染状态。
 #[derive(Clone)]
@@ -68,11 +90,15 @@ impl TranslateWindow {
             .unwrap_or(2);
 
         let source_lang = cx.new(|cx| {
-            SelectState::new(languages.clone(), Some(IndexPath::new(source_ix)), window, cx)
+            SelectState::new(
+                languages.clone(),
+                Some(IndexPath::new(source_ix)),
+                window,
+                cx,
+            )
         });
-        let target_lang = cx.new(|cx| {
-            SelectState::new(languages, Some(IndexPath::new(target_ix)), window, cx)
-        });
+        let target_lang =
+            cx.new(|cx| SelectState::new(languages, Some(IndexPath::new(target_ix)), window, cx));
         let source = cx.new(|cx| TextareaState::new(window, cx));
 
         let instances = store.service_list(saladict_core::config::keys::TRANSLATE_SERVICE_LIST);
@@ -84,7 +110,7 @@ impl TranslateWindow {
             })
             .collect();
 
-        let mut this = Self {
+        let this = Self {
             source,
             source_lang,
             target_lang,
@@ -96,7 +122,31 @@ impl TranslateWindow {
 
         // dynamic_translate：文本变化后 500ms 防抖自动翻译。
         if store.get_or(saladict_core::config::keys::DYNAMIC_TRANSLATE, false) {
-            cx.subscribe_in(&this.source, window, Self::on_source_changed).detach();
+            cx.subscribe_in(&this.source, window, Self::on_source_changed)
+                .detach();
+        }
+
+        // 窗口几何记忆 + 失焦关闭（对齐原版 Translate 窗行为）。
+        // 写回时机选失焦瞬间：此后窗口可能立即被移除，且避免拖动中频繁落盘。
+        let remember_size = store.get_or(
+            saladict_core::config::keys::TRANSLATE_REMEMBER_WINDOW_SIZE,
+            false,
+        );
+        let close_on_blur =
+            store.get_or(saladict_core::config::keys::TRANSLATE_CLOSE_ON_BLUR, true);
+        if remember_size || close_on_blur {
+            cx.observe_window_activation(window, move |_, window, _| {
+                if window.is_window_active() {
+                    return;
+                }
+                if remember_size {
+                    persist_window_bounds(window);
+                }
+                if close_on_blur {
+                    window.remove_window();
+                }
+            })
+            .detach();
         }
 
         this
@@ -120,13 +170,13 @@ impl TranslateWindow {
                 .timer(std::time::Duration::from_millis(500))
                 .await;
             // 代次不匹配说明用户还在输入，跳过。
-            let _ = this.update(cx, |this, cx| {
+            let _ = this.update_in(cx, |this, window, cx| {
                 if this.dynamic_generation.get() != gen {
                     return;
                 }
                 let text = this.source.read(cx).value().trim().to_string();
                 if !text.is_empty() {
-                    this.run_translate(text, cx);
+                    this.run_translate(text, window, cx);
                 }
             });
         })
@@ -155,30 +205,47 @@ impl TranslateWindow {
         if text.is_empty() {
             return;
         }
-        self.run_translate(text, cx);
+        self.run_translate(text, window, cx);
     }
 
     /// 用已写入输入框的文本触发翻译（点「翻译」按钮的等价逻辑）。
-    fn run_translate(&mut self, text: String, cx: &mut Context<Self>) {
+    fn run_translate(&mut self, text: String, window: &mut Window, cx: &mut Context<Self>) {
         let store = config();
-        let from = self.selected_language(&self.source_lang, cx, Language::Auto);
-        let to = self.selected_language(&self.target_lang, cx, Language::ZhCn);
-        // 记住语言选择，与原 translate_remember_language 行为一致。
-        let _ = store.set(
-            saladict_core::config::keys::TRANSLATE_SOURCE_LANGUAGE,
-            &from.code().to_string(),
-        );
-        let _ = store.set(
-            saladict_core::config::keys::TRANSLATE_TARGET_LANGUAGE,
-            &to.code().to_string(),
-        );
+        let mut from = self.selected_language(&self.source_lang, cx, Language::Auto);
+        let mut to = self.selected_language(&self.target_lang, cx, Language::ZhCn);
+        // translate_remember_language：开启时才把语言选择写回 config。
+        if store.get_or(keys::TRANSLATE_REMEMBER_LANGUAGE, true) {
+            let _ = store.set(keys::TRANSLATE_SOURCE_LANGUAGE, &from.code().to_string());
+            let _ = store.set(keys::TRANSLATE_TARGET_LANGUAGE, &to.code().to_string());
+        }
 
         // translate_delete_newline：非 0 时去除换行符。
-        let text = if store.get_or(saladict_core::config::keys::TRANSLATE_DELETE_NEWLINE, 0) > 0 {
+        let text = if store.get_or(keys::TRANSLATE_DELETE_NEWLINE, 0) > 0 {
             text.replace('\n', " ")
         } else {
             text
         };
+
+        // translate_detect_engine = "local"：源语言为 auto 时先本地检测，
+        // 把具体语言传给服务（UI 下拉仍保持「自动检测」，与原版行为一致）。
+        if from == Language::Auto
+            && store.get_or(keys::TRANSLATE_DETECT_ENGINE, String::from("local")) == "local"
+        {
+            if let Some(detected) = saladict_platform::detect::detect(&text) {
+                from = detected;
+            }
+        }
+
+        // translate_second_language：目标语与源语相同（无法翻译自己）时，
+        // 自动改用配置的第二目标语，避免服务报「相同语言」错误。
+        if from != Language::Auto && from == to {
+            let second = store.get_or(keys::TRANSLATE_SECOND_LANGUAGE, String::from("zh_cn"));
+            if let Some(second) = Language::from_code(&second) {
+                if second != Language::Auto {
+                    to = second;
+                }
+            }
+        }
 
         for card in self.cards.iter_mut() {
             card.state = CardState::Loading;
@@ -210,7 +277,9 @@ impl TranslateWindow {
             })
             .detach();
 
-            cx.spawn(async move |this, cx| {
+            // 全部实例的任务都结束后执行 auto_copy / hide_window（见
+            // `on_translate_finished`）；流式上屏只改中间态，不参与完成判定。
+            cx.spawn_in(window, async move |this, cx| {
                 let state = match task.await {
                     Ok(Ok(result)) => CardState::Done(result),
                     Ok(Err(e)) => CardState::Failed(e.to_string()),
@@ -219,12 +288,77 @@ impl TranslateWindow {
                         CardState::Failed(t_args("task-cancelled", &[("error", &msg)]))
                     }
                 };
-                let _ = this.update(cx, |this, cx| {
+                let _ = this.update_in(cx, |this, window, cx| {
                     if let Some(card) = this.cards.get_mut(idx) {
                         card.state = state;
                     }
+                    if !this.cards.is_empty()
+                        && !this
+                            .cards
+                            .iter()
+                            .any(|card| matches!(card.state, CardState::Loading))
+                    {
+                        this.on_translate_finished(window, cx);
+                    }
                     cx.notify();
                 });
+            })
+            .detach();
+        }
+    }
+
+    /// 所有服务实例翻译结束后执行：`translate_auto_copy` 按模式复制
+    /// 源文/译文，`translate_hide_window` 收起窗口（gpui 无窗口级 hide，
+    /// 用移除窗口实现；下次取词时 translate_text 会按配置自动重开），
+    /// 最后弹通知窗反馈（3 秒自动消失）。
+    fn on_translate_finished(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let store = config();
+        let mode = store.get_or(keys::TRANSLATE_AUTO_COPY, String::from("disable"));
+        let source_text = self.source.read(cx).value().trim().to_string();
+        let targets: Vec<String> = self
+            .cards
+            .iter()
+            .filter_map(|card| match &card.state {
+                CardState::Done(result) => Some(result.as_text().to_string()),
+                _ => None,
+            })
+            .collect();
+
+        let copied: Option<String> = match mode.as_str() {
+            "source" => (!source_text.is_empty()).then(|| source_text.clone()),
+            "target" => (!targets.is_empty()).then(|| targets.join("\n")),
+            "source_target" => {
+                let mut parts = Vec::new();
+                if !source_text.is_empty() {
+                    parts.push(source_text.clone());
+                }
+                parts.extend(targets);
+                (!parts.is_empty()).then(|| parts.join("\n"))
+            }
+            _ => None,
+        };
+        if let Some(text) = &copied {
+            cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
+        }
+
+        let hide_window = store.get_or(keys::TRANSLATE_HIDE_WINDOW, false);
+        if hide_window {
+            window.remove_window();
+        }
+
+        if copied.is_some() || hide_window {
+            let mut message = String::new();
+            if copied.is_some() {
+                message.push_str(&t("notify-copied"));
+            }
+            if hide_window {
+                if !message.is_empty() {
+                    message.push('，');
+                }
+                message.push_str(&t("notify-hidden"));
+            }
+            cx.spawn(async move |_, cx| {
+                cx.update(|cx| crate::notify::open_notify(cx, message));
             })
             .detach();
         }
@@ -239,10 +373,23 @@ impl TranslateWindow {
         if text.is_empty() {
             return;
         }
+        // incremental_translate：对齐原版 SourceArea::handleNewText——新文本
+        // 不替换而是追加到源文（空格连接），随后对整段文本重新翻译。
         // 用 replace_all 而非 set_value：保留撤销栈，且与用户编辑行为一致。
-        self.source
-            .update(cx, |source, cx| source.replace_all(text.clone(), window, cx));
-        self.run_translate(text, cx);
+        let full = if config().get_or(keys::INCREMENTAL_TRANSLATE, false) {
+            let old = self.source.read(cx).value().trim().to_string();
+            if old.is_empty() {
+                text.clone()
+            } else {
+                format!("{old} {text}")
+            }
+        } else {
+            text.clone()
+        };
+        self.source.update(cx, |source, cx| {
+            source.replace_all(full.clone(), window, cx)
+        });
+        self.run_translate(full, window, cx);
     }
 
     fn swap_languages(&mut self, _: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -270,7 +417,13 @@ impl TranslateWindow {
         }
     }
 
-    fn render_card(&self, card: &Card, idx: usize, cx: &mut Context<Self>) -> AnyElement {
+    fn render_card(
+        &self,
+        card: &Card,
+        idx: usize,
+        cx: &mut Context<Self>,
+        font_size: f32,
+    ) -> AnyElement {
         let theme = cx.theme();
         let name = instance_display_name(&card.instance, &config());
 
@@ -282,9 +435,14 @@ impl TranslateWindow {
             CardState::Loading => h_flex()
                 .gap_2()
                 .child(Spinner::new().small())
-                .child(div().text_color(theme.colors.muted_foreground).child(SharedString::from(t("app-translating"))))
+                .child(
+                    div()
+                        .text_color(theme.colors.muted_foreground)
+                        .child(SharedString::from(t("app-translating"))),
+                )
                 .into_any_element(),
             CardState::Done(result) => div()
+                .text_size(px(font_size))
                 .text_color(theme.colors.foreground)
                 .child(SharedString::from(result.as_text()))
                 .into_any_element(),
@@ -306,11 +464,24 @@ impl TranslateWindow {
             .child(
                 h_flex()
                     .justify_between()
+                    .items_center()
                     .child(
-                        div()
-                            .text_size(px(12.))
-                            .text_color(theme.colors.muted_foreground)
-                            .child(name),
+                        // 服务来源行：品牌 logo + 实例名。
+                        h_flex()
+                            .gap_1()
+                            .items_center()
+                            .when_some(
+                                crate::logos::logo_uri(parse_instance(&card.instance).0),
+                                |this, uri| {
+                                    this.child(img(uri).size(px(14.)).rounded_sm().flex_shrink_0())
+                                },
+                            )
+                            .child(
+                                div()
+                                    .text_size(px(12.))
+                                    .text_color(theme.colors.muted_foreground)
+                                    .child(name),
+                            ),
                     )
                     .child(
                         Button::new(("copy", idx))
@@ -329,8 +500,12 @@ impl TranslateWindow {
 }
 
 impl Render for TranslateWindow {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+        // 翻译窗口行为配置：字号 / 隐藏源文 / 隐藏语言行。
+        let font_size: f32 = config().get_or(keys::TRANSLATE_FONT_SIZE, 16.0);
+        let hide_source = config().get_or(keys::HIDE_SOURCE, false);
+        let hide_language = config().get_or(keys::HIDE_LANGUAGE, false);
 
         v_flex()
             .size_full()
@@ -364,42 +539,45 @@ impl Render for TranslateWindow {
                             }),
                     ),
             )
-            // 语言行
-            .child(
-                h_flex()
-                    .w_full()
-                    .px_2()
-                    .py_1()
-                    .gap_1()
-                    .items_center()
-                    .child(Select::new(&self.source_lang).xsmall().w(relative(0.35)))
-                    .child(
-                        Button::new("swap")
-                            .ghost()
-                            .xsmall()
-                            .icon(IconName::Replace)
-                            .on_click(cx.listener(Self::swap_languages)),
-                    )
-                    .child(Select::new(&self.target_lang).xsmall().w(relative(0.35))),
-            )
-            // 源文本
-            .child(
-                v_flex().px_2().pb_1().child(Textarea::new(&self.source).h(px(96.))),
-            )
+            // 语言行（hide_language 开启时隐藏）
+            .when(!hide_language, |this| {
+                this.child(
+                    h_flex()
+                        .w_full()
+                        .px_2()
+                        .py_1()
+                        .gap_1()
+                        .items_center()
+                        .child(Select::new(&self.source_lang).xsmall().w(relative(0.35)))
+                        .child(
+                            Button::new("swap")
+                                .ghost()
+                                .xsmall()
+                                .icon(IconName::Replace)
+                                .on_click(cx.listener(Self::swap_languages)),
+                        )
+                        .child(Select::new(&self.target_lang).xsmall().w(relative(0.35))),
+                )
+            })
+            // 源文本（hide_source 开启时隐藏，仅展示结果卡片）
+            .when(!hide_source, |this| {
+                this.child(
+                    v_flex().px_2().pb_1().child(
+                        Textarea::new(&self.source)
+                            .h(px(96.))
+                            .text_size(px(font_size)),
+                    ),
+                )
+            })
             // 操作行
             .child(
-                h_flex()
-                    .px_2()
-                    .pb_1()
-                    .justify_between()
-                    .child(div())
-                    .child(
-                        Button::new("translate")
-                            .primary()
-                            .small()
-                            .label(SharedString::from(t("translate-action")))
-                            .on_click(cx.listener(Self::start_translate)),
-                    ),
+                h_flex().px_2().pb_1().justify_between().child(div()).child(
+                    Button::new("translate")
+                        .primary()
+                        .small()
+                        .label(SharedString::from(t("translate-action")))
+                        .on_click(cx.listener(Self::start_translate)),
+                ),
             )
             // 结果卡片列表
             .child(
@@ -407,13 +585,14 @@ impl Render for TranslateWindow {
                     .id("results")
                     .flex_1()
                     .min_h_0()
-                    .overflow_y_scroll().track_scroll(&self.scroll)
+                    .overflow_y_scroll()
+                    .track_scroll(&self.scroll)
                     .child(
                         v_flex().px_2().pb_2().gap_2().children(
                             self.cards
                                 .iter()
                                 .enumerate()
-                                .map(|(idx, card)| self.render_card(card, idx, cx)),
+                                .map(|(idx, card)| self.render_card(card, idx, cx, font_size)),
                         ),
                     ),
             )

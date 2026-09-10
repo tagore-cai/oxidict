@@ -3,9 +3,9 @@
 //! 原实现走 `@tauri-apps/api/http` 的 `fetch`，由 WebView 代理到 Rust 网络层。
 //! 现在直接在 Rust 内发请求，签名与解析都在同一进程完成，省掉一次跨进程往返。
 
-use saladict_core::{Error, Result};
 use futures::Stream;
 use reqwest::{Client, IntoUrl, RequestBuilder, Response};
+use saladict_core::{Error, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::sync::Arc;
@@ -13,7 +13,9 @@ use std::time::Duration;
 
 const DEFAULT_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-static CLIENT: std::sync::RwLock<Option<Arc<Client>>> = std::sync::RwLock::new(None);
+// 与项目其余部分一致用 parking_lot：无 poisoning，读写失败不会 panic，
+// 也就不需要 `unwrap()`。
+static CLIENT: parking_lot::RwLock<Option<Arc<Client>>> = parking_lot::RwLock::new(None);
 
 fn build_client() -> Client {
     let mut builder = Client::builder()
@@ -31,12 +33,10 @@ fn build_client() -> Client {
 
 /// 进程内共享的 HTTP 客户端。代理配置变化后调用 [`rebuild_client`] 热更新。
 pub fn client() -> Arc<Client> {
-    let read = CLIENT.read().unwrap();
-    if let Some(c) = read.as_ref() {
+    if let Some(c) = CLIENT.read().as_ref() {
         return c.clone();
     }
-    drop(read);
-    let mut write = CLIENT.write().unwrap();
+    let mut write = CLIENT.write();
     // Double-check：另一线程可能已经创建了。
     if let Some(c) = write.as_ref() {
         return c.clone();
@@ -48,7 +48,7 @@ pub fn client() -> Arc<Client> {
 
 /// 代理配置变化后重建客户端，下次调用 [`client`] 即拿到新实例。
 pub fn rebuild_client() {
-    let mut write = CLIENT.write().unwrap();
+    let mut write = CLIENT.write();
     *write = Some(Arc::new(build_client()));
 }
 
@@ -67,7 +67,7 @@ impl<T> NetErr<T> for std::result::Result<T, reqwest::Error> {
 }
 
 /// 统一的响应校验：非 2xx 时转成带状态码与响应体的错误。
-pub async fn check(mut resp: Response) -> Result<Response> {
+pub async fn check(resp: Response) -> Result<Response> {
     let status = resp.status();
     if status.is_success() {
         return Ok(resp);
@@ -91,14 +91,14 @@ fn truncate(s: &str, max: usize) -> String {
 pub async fn get_json<T: DeserializeOwned>(url: impl IntoUrl) -> Result<T> {
     let resp = client().get(url).send().await.net_err()?;
     let resp = check(resp).await?;
-    Ok(resp.json().await.net_err()?)
+    resp.json().await.net_err()
 }
 
 /// 返回原始的 `serde_json::Value`，用于 Google 这类返回异构数组的接口。
 pub async fn get_value(url: impl IntoUrl) -> Result<serde_json::Value> {
     let resp = client().get(url).send().await.net_err()?;
     let resp = check(resp).await?;
-    Ok(resp.json().await.net_err()?)
+    resp.json().await.net_err()
 }
 
 pub async fn post_json<B: Serialize, T: DeserializeOwned>(
@@ -107,28 +107,28 @@ pub async fn post_json<B: Serialize, T: DeserializeOwned>(
 ) -> Result<T> {
     let resp = client().post(url).json(body).send().await.net_err()?;
     let resp = check(resp).await?;
-    Ok(resp.json().await.net_err()?)
+    resp.json().await.net_err()
 }
 
-pub async fn post_json_value<B: Serialize>(url: impl IntoUrl, body: &B) -> Result<serde_json::Value> {
+pub async fn post_json_value<B: Serialize>(
+    url: impl IntoUrl,
+    body: &B,
+) -> Result<serde_json::Value> {
     let resp = client().post(url).json(body).send().await.net_err()?;
     let resp = check(resp).await?;
-    Ok(resp.json().await.net_err()?)
+    resp.json().await.net_err()
 }
 
-pub async fn post_form<T: DeserializeOwned>(
-    url: impl IntoUrl,
-    form: &[(&str, &str)],
-) -> Result<T> {
+pub async fn post_form<T: DeserializeOwned>(url: impl IntoUrl, form: &[(&str, &str)]) -> Result<T> {
     let resp = client().post(url).form(form).send().await.net_err()?;
     let resp = check(resp).await?;
-    Ok(resp.json().await.net_err()?)
+    resp.json().await.net_err()
 }
 
 pub async fn get_text(url: impl IntoUrl) -> Result<String> {
     let resp = client().get(url).send().await.net_err()?;
     let resp = check(resp).await?;
-    Ok(resp.text().await.net_err()?)
+    resp.text().await.net_err()
 }
 
 pub async fn get_bytes(url: impl IntoUrl) -> Result<Vec<u8>> {
@@ -173,7 +173,7 @@ pub fn sse_text(resp: Response) -> impl Stream<Item = Result<String>> {
             };
             futures::future::ready(Some(out))
         })
-        .flat_map(|lines| futures::stream::iter(lines))
+        .flat_map(futures::stream::iter)
 }
 
 /// 从一行 SSE 数据中提取内容。`[DONE]` 表示流结束。

@@ -55,6 +55,8 @@ config-saved-hint = Saved (some settings take effect after restart)
 config-title = Preferences
 important-notice = Important notice
 notify-error-open = Failed to open notify window
+notify-copied = Buferge göçürildi
+notify-hidden = Terjime penjiresi gizledi
 recognize-action = Recognize
 recognize-copy = Copy result
 recognize-image-bytes = Image { $bytes } bytes
@@ -96,3 +98,13 @@ updater-hint = Click "Check for updates" to see if there's a new version
 updater-latest-version = Latest version: { $version }
 updater-title = Check for updates
 updater-window-title = Saladict · Update
+
+## 托盘补充
+tray-auto-copy = Awtomatik göçürme
+tray-copy-source = Çeşme
+tray-copy-target = Nyşan
+tray-copy-source-target = Çeşme+Nyşan
+tray-copy-disable = Öçürmek
+tray-check-update = Täzelemegi barlamak
+tray-view-log = Gündeligi görkez
+tray-restart = Täze başdan işe giriz

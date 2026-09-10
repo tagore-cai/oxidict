@@ -90,14 +90,11 @@ impl Translator for BingDict {
         let mut groups: std::collections::HashMap<&str, Vec<&Value>> =
             formats.iter().map(|f| (*f, Vec::new())).collect();
         for g in meaning_groups {
-            let group = g
-                .get("partsOfSpeech")
-                .and_then(|v| v.get(0))
-                .and_then(|v| {
-                    v.get("description")
-                        .and_then(|d| d.as_str())
-                        .or_else(|| v.get("name").and_then(|n| n.as_str()))
-                });
+            let group = g.get("partsOfSpeech").and_then(|v| v.get(0)).and_then(|v| {
+                v.get("description")
+                    .and_then(|d| d.as_str())
+                    .or_else(|| v.get("name").and_then(|n| n.as_str()))
+            });
             if let Some(group) = group {
                 if let Some(bucket) = groups.get_mut(group) {
                     bucket.push(g);
@@ -148,16 +145,14 @@ impl Translator for BingDict {
                             .collect::<Vec<_>>()
                     })
                     .unwrap_or_default();
-                dict.explanations.push(saladict_core::model::Explanation {
-                    trait_,
-                    explains,
-                });
+                dict.explanations
+                    .push(saladict_core::model::Explanation { trait_, explains });
             }
         }
 
         // 变形（取第一个 group 的 fragments 文本）
         if let Some(assoc) = groups.get("变形") {
-            if let Some(first) = assoc.get(0) {
+            if let Some(first) = assoc.first() {
                 if let Some(frags) = first
                     .get("meanings")
                     .and_then(|v| v.get(0))

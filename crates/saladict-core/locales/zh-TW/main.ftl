@@ -55,6 +55,8 @@ config-saved-hint = Saved (some settings take effect after restart)
 config-title = Preferences
 important-notice = Important notice
 notify-error-open = Failed to open notify window
+notify-copied = 已複製到剪貼簿
+notify-hidden = 翻譯視窗已隱藏
 recognize-action = Recognize
 recognize-copy = Copy result
 recognize-image-bytes = Image { $bytes } bytes
@@ -96,3 +98,13 @@ updater-hint = Click "Check for updates" to see if there's a new version
 updater-latest-version = ## 已安裝最新版本
 updater-title = 檢查更新
 updater-window-title = Saladict · Update
+
+## 托盘补充
+tray-auto-copy = 自動複製
+tray-copy-source = 原文
+tray-copy-target = 譯文
+tray-copy-source-target = 原文+譯文
+tray-copy-disable = 關閉
+tray-check-update = 檢查更新
+tray-view-log = 查看日誌
+tray-restart = 重啟程式

@@ -32,5 +32,7 @@ pub fn register(services: &crate::Services) {
     services.register_recognizer(std::sync::Arc::new(tencent_img::TencentImg));
     services.register_recognizer(std::sync::Arc::new(tesseract::Tesseract));
     services.register_recognizer(std::sync::Arc::new(volcengine::Volcengine));
-    services.register_recognizer(std::sync::Arc::new(volcengine_multi_lang::VolcengineMultiLang));
+    services.register_recognizer(std::sync::Arc::new(
+        volcengine_multi_lang::VolcengineMultiLang,
+    ));
 }

@@ -3,18 +3,18 @@
 //! 对应原 `src/window/Updater`：显示当前版本，「检查更新」按钮拉取 GitHub
 //! latest release 接口，「前往下载」按钮用系统浏览器打开发布页。
 
-use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
-use saladict_core::i18n::{t, t_args};
 use gpui_kit::component::button::Button;
 use gpui_kit::component::button::ButtonVariants as _;
-use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
 use gpui_kit::component::Root;
+use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
+use gpui_kit::AppContext as _;
 use gpui_kit::{
-    div, px, App, AnyElement, AsyncApp, Bounds, ClickEvent, Context, FontWeight, IntoElement,
-    InteractiveElement, ParentElement, Point, Render, SharedString, Size, Styled,
-    StatefulInteractiveElement, TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions,
+    div, px, AnyElement, App, AsyncApp, Bounds, ClickEvent, Context, FontWeight,
+    InteractiveElement, IntoElement, ParentElement, Point, Render, SharedString, Size, Styled,
+    TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions,
 };
+use saladict_core::i18n::{t, t_args};
 use saladict_net::get_value;
 
 pub struct UpdaterWindow {
@@ -43,8 +43,7 @@ impl UpdaterWindow {
         self.body = None;
         cx.notify();
 
-        let url =
-            "https://api.github.com/repos/allentown521/saladict/releases/latest".to_string();
+        let url = "https://api.github.com/repos/allentown521/saladict/releases/latest".to_string();
         cx.spawn(async move |this, cx: &mut AsyncApp| {
             let result = get_value(url).await;
             let _ = this.update(cx, |this, cx| {
@@ -95,17 +94,15 @@ impl UpdaterWindow {
                         .text_color(theme.colors.foreground)
                         .text_size(px(13.))
                         .child(SharedString::from(t_args(
-                        "updater-latest-version",
-                        &[("version", latest.as_str())],
-                    ))),
+                            "updater-latest-version",
+                            &[("version", latest.as_str())],
+                        ))),
                 )
                 .child(
                     div()
                         .text_color(theme.colors.muted_foreground)
                         .text_size(px(12.))
-                        .child(SharedString::from(
-                            self.body.clone().unwrap_or_default(),
-                        )),
+                        .child(SharedString::from(self.body.clone().unwrap_or_default())),
                 )
                 .into_any_element();
         }
@@ -122,7 +119,7 @@ impl Render for UpdaterWindow {
         let theme = cx.theme();
         v_flex()
             .size_full()
-            .bg(theme.colors.background)
+            .bg(crate::window_root_bg(theme.colors.background))
             .text_color(theme.colors.foreground)
             .child(
                 h_flex()
@@ -139,11 +136,11 @@ impl Render for UpdaterWindow {
                         div()
                             .text_size(px(13.))
                             .font_weight(FontWeight::MEDIUM)
-                    .child(SharedString::from(format!(
-                        "{} · v{}",
-                        t("app-name"),
-                        self.current_version
-                    ))),
+                            .child(SharedString::from(format!(
+                                "{} · v{}",
+                                t("app-name"),
+                                self.current_version
+                            ))),
                     )
                     .child(
                         Button::new("close")
@@ -170,8 +167,8 @@ impl Render for UpdaterWindow {
                                 Button::new("check")
                                     .primary()
                                     .small()
-                                .label(t("updater-title"))
-                                .disabled(self.checking)
+                                    .label(t("updater-title"))
+                                    .disabled(self.checking)
                                     .on_click(cx.listener(Self::check_update)),
                             )
                             .child(if self.checking {
@@ -195,20 +192,18 @@ impl Render for UpdaterWindow {
                             .child(self.render_status(cx)),
                     )
                     .child(
-                        h_flex()
-                            .justify_end()
-                            .child(
-                                Button::new("download")
-                                    .ghost()
-                                    .small()
-                                    .label(t("updater-download"))
-                                    .icon(IconName::ExternalLink)
-                                    .on_click(cx.listener(|_, _, _, cx| {
-                                        cx.open_url(
-                                            "https://github.com/allentown521/saladict/releases/latest",
-                                        );
-                                    })),
-                            ),
+                        h_flex().justify_end().child(
+                            Button::new("download")
+                                .ghost()
+                                .small()
+                                .label(t("updater-download"))
+                                .icon(IconName::ExternalLink)
+                                .on_click(cx.listener(|_, _, _, cx| {
+                                    cx.open_url(
+                                        "https://github.com/allentown521/saladict/releases/latest",
+                                    );
+                                })),
+                        ),
                     ),
             )
     }
@@ -238,6 +233,7 @@ pub fn open_updater(cx: &mut App) {
         focus: true,
         show: true,
         kind: WindowKind::Normal,
+        window_background: crate::window_background_appearance(),
         ..Default::default()
     };
 

@@ -77,7 +77,11 @@ impl Translator for Youdao {
         let result: Value = resp.json().await.net_err()?;
 
         // 词典模式
-        if result.get("isWord").and_then(|v| v.as_bool()).unwrap_or(false) {
+        if result
+            .get("isWord")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
             let mut dict = DictResult::new();
             let basic = result.get("basic").cloned().unwrap_or(Value::Null);
 
@@ -123,7 +127,11 @@ impl Translator for Youdao {
                         .map(|s| s.to_string())
                         .collect();
                     dict.explanations.push(Explanation {
-                        trait_: if trait_.is_empty() { None } else { Some(trait_) },
+                        trait_: if trait_.is_empty() {
+                            None
+                        } else {
+                            Some(trait_)
+                        },
                         explains,
                     });
                 }
@@ -131,8 +139,14 @@ impl Translator for Youdao {
 
             if let Some(wfs) = basic.get("wfs").and_then(|v| v.as_array()) {
                 for wf in wfs {
-                    let name = wf.pointer("/wf/name").and_then(|v| v.as_str()).unwrap_or_default();
-                    let value = wf.pointer("/wf/value").and_then(|v| v.as_str()).unwrap_or_default();
+                    let name = wf
+                        .pointer("/wf/name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default();
+                    let value = wf
+                        .pointer("/wf/value")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default();
                     dict.associations.push(format!("{} {}", name, value));
                 }
             }

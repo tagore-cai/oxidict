@@ -1,19 +1,18 @@
 //! 安装 `.potext` 插件。
 //!
 //! 与老版本一致：`.potext` 就是一个 zip，含 `info.json` 与 `main.js`。
-//! 差别在于老版本装完直接 `eval(main.js)`，这里装完要做一次 ESM 改写，
-//! 生成 gpui-shell 能加载的 `worker.js` + `gpui-shell.json`。
+//! 装完不需要任何改写——运行时直接 eval 原始 `main.js`。
 
-use crate::shim::{convert_potext, PluginKind};
 use crate::{Error, Result};
 use saladict_core::config::ConfigStore;
+use saladict_core::ServiceKind;
 use std::fs::File;
 use std::path::Path;
 
 /// 安装一个 `.potext`，返回插件 id。
 ///
 /// 校验规则沿用上游：包名必须以 `plugin` 开头，包内必须有 `info.json` 与 `main.js`。
-pub fn install(potext: &Path, kind: PluginKind, store: &ConfigStore) -> Result<String> {
+pub fn install(potext: &Path, kind: ServiceKind, store: &ConfigStore) -> Result<String> {
     let file_name = potext
         .file_name()
         .and_then(|n| n.to_str())
@@ -51,16 +50,6 @@ pub fn install(potext: &Path, kind: PluginKind, store: &ConfigStore) -> Result<S
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
         .unwrap_or_else(|| file_name.trim_end_matches(".potext").to_string());
-    let name = info
-        .get("name")
-        .and_then(|v| v.as_str())
-        .unwrap_or(&plugin_id)
-        .to_string();
-    let version = info
-        .get("version")
-        .and_then(|v| v.as_str())
-        .unwrap_or("0.0.0")
-        .to_string();
 
     let target = store.plugin_dir().join(kind.dir_name()).join(&plugin_id);
     if target.exists() {
@@ -68,24 +57,22 @@ pub fn install(potext: &Path, kind: PluginKind, store: &ConfigStore) -> Result<S
     }
     std::fs::create_dir_all(&target)?;
     copy_dir(&staging, &target)?;
-
-    convert_potext(&target, &plugin_id, &name, &version, kind)?;
     let _ = std::fs::remove_dir_all(&staging);
 
     Ok(plugin_id)
 }
 
-pub fn uninstall(plugin_id: &str, kind: PluginKind, store: &ConfigStore) -> Result<()> {
+pub fn uninstall(plugin_id: &str, kind: ServiceKind, store: &ConfigStore) -> Result<()> {
     let dir = store.plugin_dir().join(kind.dir_name()).join(plugin_id);
     if dir.exists() {
         std::fs::remove_dir_all(&dir)?;
     }
-    crate::bridge::drop_bridge(plugin_id);
+    crate::runtime::unload(plugin_id);
     Ok(())
 }
 
 /// 列出某类型下已安装的插件 id。
-pub fn installed(kind: PluginKind, store: &ConfigStore) -> Vec<String> {
+pub fn installed(kind: ServiceKind, store: &ConfigStore) -> Vec<String> {
     let dir = store.plugin_dir().join(kind.dir_name());
     let mut out = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&dir) {

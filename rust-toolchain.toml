@@ -1,0 +1,6 @@
+# 固定工具链：gpui-kit / gpui-shell 走 git 依赖，对 rustc 版本敏感，
+# 不同版本编译出的 workspace 不可混用，故把版本写进仓库而不是依赖本机默认。
+[toolchain]
+channel = "1.98.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

@@ -7,11 +7,13 @@
 use crate::Recognizer;
 use async_trait::async_trait;
 use base64::Engine as _;
-use saladict_core::HasConfig as _;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::{Error, Language, Result, RecognizeRequest};
-use saladict_net::{aws_date, aws_now, hmac_sha256_hex, hmac_sha256_raw, post_with_headers, sha256_hex};
+use saladict_core::HasConfig as _;
+use saladict_core::{Error, Language, RecognizeRequest, Result};
+use saladict_net::{
+    aws_date, aws_now, hmac_sha256_hex, hmac_sha256_raw, post_with_headers, sha256_hex,
+};
 use serde_json::Value;
 use urlencoding::encode as url_encode;
 

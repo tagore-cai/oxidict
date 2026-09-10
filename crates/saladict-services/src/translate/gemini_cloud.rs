@@ -5,11 +5,11 @@
 //! 鉴权头 `Authorization: Bearer <apiKey>`，SSE 增量字段 `choices[0].delta.content`。
 
 use crate::Translator;
-use saladict_core::HasConfig as _;
 use async_trait::async_trait;
 use futures::StreamExt;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
+use saladict_core::HasConfig as _;
 use saladict_core::{Error, Language, Result, TranslateRequest, TranslateResult};
 use serde_json::{json, Value};
 
@@ -128,10 +128,7 @@ impl Translator for GeminiCloud {
             .unwrap_or(DEFAULT_TEMP);
 
         let to_lang = self.map_language(req.to);
-        let user_content = format!(
-            "Translate into {}:\n\"\"\"\n{}\n\"\"\"",
-            to_lang, req.text
-        );
+        let user_content = format!("Translate into {}:\n\"\"\"\n{}\n\"\"\"", to_lang, req.text);
         let messages = json!([
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
@@ -152,10 +149,7 @@ impl Translator for GeminiCloud {
         ];
 
         let rb = saladict_net::post_with_headers(url, &headers).json(&body);
-        let resp = rb
-            .send()
-            .await
-            .map_err(|e| Error::Network(e.to_string()))?;
+        let resp = rb.send().await.map_err(|e| Error::Network(e.to_string()))?;
         let resp = saladict_net::check(resp).await?;
 
         // 流式：边解析 SSE 增量边推送。

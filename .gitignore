@@ -1,3 +1,10 @@
-target/
+# 构建产物（含 cargo 中断残留的 target 副本目录）
+target*/
 *.dmg
+
+# 锁文件：Cargo.lock 对 binary 仓库应提交，其余 lock 忽略
 *.lock
+!Cargo.lock
+
+# macOS 目录元数据
+.DS_Store

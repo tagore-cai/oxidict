@@ -24,7 +24,11 @@ pub mod niutrans;
 pub mod ollama;
 pub mod openai;
 pub mod openai_cloud;
-pub mod openai_compatible;
+/// OpenAI 协议共享实现层（消息构造、URL 规范化、请求体组装），被
+/// openai / ollama / geminipro 复用。它不是可注册的服务——不在
+/// `register()` 里注册，也不应作为服务 id 出现在 config.json 中，
+/// 故收紧为 crate 内可见。
+pub(crate) mod openai_compatible;
 pub mod tencent;
 pub mod tongyi_cloud;
 pub mod transmart;

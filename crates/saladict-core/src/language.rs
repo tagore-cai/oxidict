@@ -9,9 +9,10 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// 内部语言码。与 saladict v4 `languageList` 一一对应，保证既有 config.json 兼容。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Language {
+    #[default]
     Auto,
     ZhCn,
     ZhTw,
@@ -225,12 +226,6 @@ impl fmt::Display for Language {
     }
 }
 
-impl Default for Language {
-    fn default() -> Self {
-        Language::Auto
-    }
-}
-
 /// 把一个「内部码 -> 厂商码」的偏差表编译成匹配分支。
 ///
 /// 未列出的语言回退为内部码本身，这样大多数服务只需声明少数几项。
@@ -256,38 +251,38 @@ macro_rules! map_language {
 impl Language {
     /// 全部语言，UI 语言选择器的数据源（顺序与原 languageList 一致）。
     pub const ALL: &'static [Language] = &[
-    Language::Auto,
-    Language::ZhCn,
-    Language::ZhTw,
-    Language::En,
-    Language::Ja,
-    Language::Ko,
-    Language::Fr,
-    Language::Es,
-    Language::Ru,
-    Language::De,
-    Language::It,
-    Language::Tr,
-    Language::PtPt,
-    Language::PtBr,
-    Language::Vi,
-    Language::Id,
-    Language::Th,
-    Language::Ms,
-    Language::Ar,
-    Language::Hi,
-    Language::Km,
-    Language::MnCy,
-    Language::NbNo,
-    Language::NnNo,
-    Language::Fa,
-    Language::Sv,
-    Language::Pl,
-    Language::Nl,
-    Language::Uk,
-    Language::He,
-    Language::MnMo,
-];
+        Language::Auto,
+        Language::ZhCn,
+        Language::ZhTw,
+        Language::En,
+        Language::Ja,
+        Language::Ko,
+        Language::Fr,
+        Language::Es,
+        Language::Ru,
+        Language::De,
+        Language::It,
+        Language::Tr,
+        Language::PtPt,
+        Language::PtBr,
+        Language::Vi,
+        Language::Id,
+        Language::Th,
+        Language::Ms,
+        Language::Ar,
+        Language::Hi,
+        Language::Km,
+        Language::MnCy,
+        Language::NbNo,
+        Language::NnNo,
+        Language::Fa,
+        Language::Sv,
+        Language::Pl,
+        Language::Nl,
+        Language::Uk,
+        Language::He,
+        Language::MnMo,
+    ];
 
     /// UI 显示名（简体中文界面）。
     pub fn display_name(self) -> &'static str {

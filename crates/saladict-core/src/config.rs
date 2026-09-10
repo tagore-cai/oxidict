@@ -42,7 +42,8 @@ pub mod keys {
     pub const PROXY_PASSWORD: &str = "proxy_password";
     pub const NO_PROXY: &str = "no_proxy";
     pub const SERVER_PORT: &str = "server_port";
-    pub const UI_LANGUAGE: &str = "ui_language";
+    // 界面语言统一走 APP_LANGUAGE（对齐原版 app_language；ui_language 曾是
+    // 重复设计，已删除，老配置里的该键会被忽略）。
     pub const APP_THEME: &str = "app_theme";
     pub const APP_FONT: &str = "app_font";
     pub const APP_FALLBACK_FONT: &str = "app_fallback_font";
@@ -77,15 +78,31 @@ pub mod keys {
     pub const WEBDAV_URL: &str = "webdav_url";
     pub const WEBDAV_USERNAME: &str = "webdav_username";
     pub const WEBDAV_PASSWORD: &str = "webdav_password";
-    pub const ALIYUN_ACCESS_TOKEN: &str = "aliyun_access_token";
-    pub const ALIYUN_REFRESH_TOKEN: &str = "aliyun_refresh_token";
+    // 阿里云盘备份已砍除：原版授权链依赖第三方中转服务器（代持 client_secret）
+    // 与他人注册的 client_id，不可复用；自建需阿里云盘开放平台账号。老配置里的
+    // aliyun_* 键会被忽略。
 
     // 托盘
     pub const TRAY_CLICK_EVENT: &str = "tray_click_event";
     pub const IGNORE_UPDATER_VERSION: &str = "ignore_updater_version";
 
+    // 外观与系统集成（对齐原版 General 页）
+    /// 窗口毛玻璃/透明（macOS Blurred 材质；新开窗口生效）。
+    pub const TRANSPARENT: &str = "transparent";
+    /// 隐藏 Dock 图标（macOS Accessory 策略，交互入口只剩托盘）。
+    pub const HIDE_DOCK_ICON: &str = "hide_dock_icon";
+
     /// 快捷键配置前缀，实际键形如 `hotkey_selection_translate`。
     pub const HOTKEY_PREFIX: &str = "hotkey_";
+
+    /// 四类窗口/动作的完整快捷键键名。
+    ///
+    /// 散落的 `"hotkey_selection_translate"` 字面量容易与上面的前缀定义
+    /// 漂移，这里集中给出，注册与默认值都引用同一份常量。
+    pub const HOTKEY_SELECTION_TRANSLATE: &str = "hotkey_selection_translate";
+    pub const HOTKEY_INPUT_TRANSLATE: &str = "hotkey_input_translate";
+    pub const HOTKEY_OCR_RECOGNIZE: &str = "hotkey_ocr_recognize";
+    pub const HOTKEY_OCR_TRANSLATE: &str = "hotkey_ocr_translate";
 }
 
 static STORE: OnceCell<Arc<ConfigStore>> = OnceCell::new();
@@ -100,6 +117,21 @@ pub fn config() -> Arc<ConfigStore> {
 
 pub fn set_global(store: Arc<ConfigStore>) {
     let _ = STORE.set(store);
+}
+
+/// 默认应用数据目录（`<config_dir>/<APP_ID>`）。不依赖 ConfigStore::init，
+/// 供日志初始化等"配置装载前"的路径需求使用。
+pub fn default_app_dir() -> Option<PathBuf> {
+    dirs::config_dir().map(|d| d.join(APP_ID))
+}
+
+/// 单实例锁文件路径。app 入口与托盘「重启」共用；重启前必须先移除锁，
+/// 否则新进程会因 PID 存活判定为「已有实例」而退出。
+pub fn runtime_lock_path() -> PathBuf {
+    dirs::runtime_dir()
+        .or_else(dirs::cache_dir)
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("saladict-app.lock")
 }
 
 pub struct ConfigStore {
@@ -119,7 +151,25 @@ impl ConfigStore {
 
     pub fn init_with_path(path: PathBuf) -> Result<Arc<Self>> {
         let data = match std::fs::read_to_string(&path) {
-            Ok(s) => serde_json::from_str::<Map<String, Value>>(&s).unwrap_or_default(),
+            Ok(s) => match serde_json::from_str::<Map<String, Value>>(&s) {
+                Ok(m) => m,
+                Err(e) => {
+                    // 解析失败不能 `unwrap_or_default()` 了事：紧随其后的
+                    // `apply_defaults` 会立刻落盘，把用户的全部配置覆盖成默认值。
+                    // 先把损坏原文改名留档，再以默认配置启动。
+                    log::error!("配置文件 {} 解析失败: {e}", path.display());
+                    let backup = path.with_extension("json.corrupt");
+                    match std::fs::rename(&path, &backup) {
+                        Ok(()) => log::error!(
+                            "已将损坏的配置另存为 {}，本次以默认配置启动",
+                            backup.display()
+                        ),
+                        Err(e) => log::error!("另存损坏配置失败（将直接覆盖）: {e}"),
+                    }
+                    Map::new()
+                }
+            },
+            // 文件不存在是首次启动的正常路径，不记错误。
             Err(_) => Map::new(),
         };
         let store = Arc::new(Self {
@@ -162,20 +212,20 @@ impl ConfigStore {
             (TRANSLATE_ALWAYS_ON_TOP, json!(true)),
             (TRANSLATE_WINDOW_WIDTH, json!(350.0)),
             (TRANSLATE_WINDOW_HEIGHT, json!(420.0)),
-            (TRANSLATE_AUTO_COPY, json!(4)),
+            // 值域对齐原版：disable | source | target | source_target
+            (TRANSLATE_AUTO_COPY, json!("disable")),
             (TRANSLATE_DETECT_ENGINE, json!("local")),
             (CLIPBOARD_MONITOR, json!(false)),
             (PROXY_ENABLE, json!(false)),
             (PROXY_HOST, json!("127.0.0.1")),
             (PROXY_PORT, json!(1087)),
             (SERVER_PORT, json!(60606)),
-            (UI_LANGUAGE, json!("zh_cn")),
             (APP_THEME, json!("system")),
             (AUTOSTART, json!(false)),
-            ("hotkey_selection_translate", json!("")),
-            ("hotkey_input_translate", json!("")),
-            ("hotkey_ocr_recognize", json!("")),
-            ("hotkey_ocr_translate", json!("")),
+            (keys::HOTKEY_SELECTION_TRANSLATE, json!("")),
+            (keys::HOTKEY_INPUT_TRANSLATE, json!("")),
+            (keys::HOTKEY_OCR_RECOGNIZE, json!("")),
+            (keys::HOTKEY_OCR_TRANSLATE, json!("")),
             // 翻译窗口行为
             (keys::DYNAMIC_TRANSLATE, json!(false)),
             (keys::INCREMENTAL_TRANSLATE, json!(false)),
@@ -186,13 +236,12 @@ impl ConfigStore {
             (keys::TRANSLATE_HIDE_WINDOW, json!(false)),
             (keys::TRANSLATE_REMEMBER_WINDOW_SIZE, json!(false)),
             (keys::TRANSLATE_WINDOW_POSITION, json!("")),
-            (keys::TRANSLATE_AUTO_COPY, json!(4)),
-            (keys::TRANSLATE_DETECT_ENGINE, json!("local")),
             (keys::HIDE_SOURCE, json!(false)),
             (keys::HIDE_LANGUAGE, json!(false)),
             (keys::HISTORY_DISABLE, json!(false)),
             // OCR 窗口行为
-            (keys::RECOGNIZE_AUTO_COPY, json!(4)),
+            // 对齐原版 bool：识别完成后复制结果
+            (keys::RECOGNIZE_AUTO_COPY, json!(false)),
             (keys::RECOGNIZE_CLOSE_ON_BLUR, json!(false)),
             (keys::RECOGNIZE_DELETE_NEWLINE, json!(false)),
             (keys::RECOGNIZE_HIDE_WINDOW, json!(false)),
@@ -211,12 +260,13 @@ impl ConfigStore {
             (keys::WEBDAV_URL, json!("")),
             (keys::WEBDAV_USERNAME, json!("")),
             (keys::WEBDAV_PASSWORD, json!("")),
-            (keys::ALIYUN_ACCESS_TOKEN, json!("")),
-            (keys::ALIYUN_REFRESH_TOKEN, json!("")),
             // 托盘与其他
             (keys::TRAY_CLICK_EVENT, json!("config")),
             (keys::IGNORE_UPDATER_VERSION, json!("")),
             (keys::DEV_MODE, json!(false)),
+            // 外观与系统集成（对齐原版默认值：透明开、隐藏 Dock 开）
+            (keys::TRANSPARENT, json!(true)),
+            (keys::HIDE_DOCK_ICON, json!(true)),
         ];
         for (k, v) in defaults {
             data.entry(k.to_string()).or_insert(v);
@@ -230,8 +280,7 @@ impl ConfigStore {
     }
 
     pub fn get<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
-        self.raw(key)
-            .and_then(|v| serde_json::from_value(v).ok())
+        self.raw(key).and_then(|v| serde_json::from_value(v).ok())
     }
 
     pub fn get_or<T: DeserializeOwned>(&self, key: &str, default: T) -> T {
@@ -267,9 +316,13 @@ impl ConfigStore {
     }
 
     /// 外部修改（例如老版本 Tauri 应用、手工编辑）后重新载入。
+    ///
+    /// 解析失败时**返回错误并保持现有内存数据不变**，不要把整个配置清空成
+    /// 默认值：监听线程可能在文件写到一半时触发 reload。
     pub fn reload(&self) -> Result<()> {
         let s = std::fs::read_to_string(&self.path)?;
-        let parsed: Map<String, Value> = serde_json::from_str(&s).unwrap_or_default();
+        let parsed: Map<String, Value> = serde_json::from_str(&s)
+            .map_err(|e| Error::Config(format!("配置文件解析失败: {e}")))?;
         *self.data.write() = parsed;
         Ok(())
     }
@@ -370,8 +423,8 @@ where
 {
     use notify::{EventKind, RecursiveMode, Watcher};
     let dir = store.app_dir();
-    let mut watcher =
-        notify::recommended_watcher(move |res: std::result::Result<notify::Event, notify::Error>| {
+    let mut watcher = notify::recommended_watcher(
+        move |res: std::result::Result<notify::Event, notify::Error>| {
             if let Ok(event) = res {
                 if matches!(
                     event.kind,
@@ -381,8 +434,9 @@ where
                     on_change();
                 }
             }
-        })
-        .map_err(|e| Error::Watch(e.to_string()))?;
+        },
+    )
+    .map_err(|e| Error::Watch(e.to_string()))?;
     watcher
         .watch(&dir, RecursiveMode::NonRecursive)
         .map_err(|e| Error::Watch(e.to_string()))?;

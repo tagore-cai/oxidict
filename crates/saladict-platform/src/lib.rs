@@ -30,11 +30,13 @@
 //! 「写临时 PNG + 调用外部 OCR 助手」的命令回退方案，并在文件中注释了升级为原生
 //! `VNRecognizeTextRequest` 的切入点。其余平台分支仅保证代码正确，无法在本机验证。
 
-pub mod selection;
+pub mod autostart;
+pub mod clipboard;
+pub mod detect;
+pub mod dock;
+pub mod hotkey;
+pub mod mouse;
 pub mod ocr;
 pub mod screenshot;
-pub mod hotkey;
-pub mod clipboard;
-pub mod mouse;
-pub mod detect;
-pub mod autostart;
+pub mod selection;
+pub mod shell;

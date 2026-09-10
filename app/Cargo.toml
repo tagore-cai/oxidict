@@ -13,10 +13,13 @@ saladict-services.workspace = true
 saladict-plugin.workspace = true
 saladict-server.workspace = true
 saladict-ui.workspace = true
-env_logger.workspace = true
+fern.workspace = true
+chrono.workspace = true
 log.workspace = true
 tokio.workspace = true
 gpui-kit.workspace = true
-tray-icon.workspace = true
+# libc 仅用于单实例锁的 `kill(pid, 0)` 存活探测（Unix；见 main.rs::process_alive）。
 libc = "0.2"
-dirs.workspace = true
+
+[lints]
+workspace = true

@@ -55,6 +55,8 @@ config-saved-hint = Saved (some settings take effect after restart)
 config-title = Preferences
 important-notice = Important notice
 notify-error-open = Failed to open notify window
+notify-copied = Скопійовано в буфер обміну
+notify-hidden = Вікно перекладу приховано
 recognize-action = Recognize
 recognize-copy = Copy result
 recognize-image-bytes = Image { $bytes } bytes
@@ -96,3 +98,13 @@ updater-hint = Click "Check for updates" to see if there's a new version
 updater-latest-version = Latest version: { $version }
 updater-title = Check for updates
 updater-window-title = Saladict · Update
+
+## 托盘补充
+tray-auto-copy = Автоматичне копіювання
+tray-copy-source = Джерело
+tray-copy-target = Мета
+tray-copy-source-target = Джерело+Мета
+tray-copy-disable = Вимкнути
+tray-check-update = Перевірити оновлення
+tray-view-log = Перегляд журналу
+tray-restart = Перезапустити додаток

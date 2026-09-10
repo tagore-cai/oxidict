@@ -86,6 +86,72 @@ impl TranslateResult {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plain_result_is_returned_verbatim() {
+        assert_eq!(TranslateResult::Plain("hello".into()).as_text(), "hello");
+    }
+
+    #[test]
+    fn dict_result_flattens_pronunciations_then_explanations() {
+        let mut d = DictResult::new();
+        d.pronunciations.push(Pronunciation {
+            symbol: Some("həˈləʊ".into()),
+            voice: None,
+        });
+        d.explanations.push(Explanation {
+            trait_: Some("int.".into()),
+            explains: vec!["你好".into(), "喂".into()],
+        });
+        d.explanations.push(Explanation {
+            trait_: None,
+            explains: vec!["招呼语".into()],
+        });
+
+        // 音标在前、释义在后；多义项用 `; ` 连接；词性与释义间一个空格；
+        // 末尾换行被 trim 掉（写入历史库时不留空行）。
+        assert_eq!(
+            TranslateResult::Dict(d).as_text(),
+            "həˈləʊ\nint. 你好; 喂\n招呼语"
+        );
+    }
+
+    #[test]
+    fn empty_dict_result_is_empty_text() {
+        assert_eq!(TranslateResult::Dict(DictResult::new()).as_text(), "");
+        assert!(DictResult::new().is_empty());
+    }
+
+    #[test]
+    fn has_config_reads_typed_values() {
+        let mut cfg = ServiceConfig::new();
+        cfg.insert("key".into(), serde_json::json!("abc"));
+        cfg.insert("flag".into(), serde_json::json!(true));
+        cfg.insert("num".into(), serde_json::json!(1.5));
+        let req = TranslateRequest::new("t", Language::Auto, Language::ZhCn).with_config(cfg);
+
+        assert_eq!(req.str("key"), Some("abc"));
+        assert!(req.bool("flag"));
+        // 缺失或类型不符都按默认处理，不 panic。
+        assert!(!req.bool("missing"));
+        assert_eq!(req.number("num"), Some(1.5));
+        assert_eq!(req.number("key"), None);
+    }
+
+    #[test]
+    fn require_str_rejects_blank() {
+        let mut cfg = ServiceConfig::new();
+        cfg.insert("empty".into(), serde_json::json!("   "));
+        let req = TranslateRequest::new("t", Language::Auto, Language::ZhCn).with_config(cfg);
+
+        assert!(req.require_str("empty", "API Key").is_err());
+        assert!(req.require_str("nope", "API Key").is_err());
+    }
+}
+
 impl From<String> for TranslateResult {
     fn from(s: String) -> Self {
         TranslateResult::Plain(s)
@@ -124,19 +190,24 @@ pub trait HasConfig {
     fn require_str(&self, key: &str, hint: &str) -> crate::error::Result<String> {
         match self.str(key) {
             Some(s) if !s.trim().is_empty() => Ok(s.to_string()),
-            _ => Err(crate::error::Error::MissingConfig(format!("{} ({})", hint, key))),
+            _ => Err(crate::error::Error::MissingConfig(format!(
+                "{} ({})",
+                hint, key
+            ))),
         }
     }
 
     fn bool(&self, key: &str) -> bool {
-        self.config().get(key).and_then(|v| v.as_bool()).unwrap_or(false)
+        self.config()
+            .get(key)
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
     }
 
     fn number(&self, key: &str) -> Option<f64> {
         self.config().get(key).and_then(|v| v.as_f64())
     }
 }
-
 
 /// 翻译调用参数。
 #[derive(Clone)]
@@ -176,7 +247,6 @@ impl TranslateRequest {
         self.on_stream = Some(sink);
         self
     }
-
 }
 
 impl HasConfig for TranslateRequest {

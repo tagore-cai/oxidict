@@ -9,12 +9,12 @@
 //! 不直接读取文件——若将来要改为直连本地 sqlite，需引入 rusqlite 依赖。
 
 use crate::Translator;
-use saladict_net::NetErr as _;
 use async_trait::async_trait;
 use saladict_core::map_language;
 use saladict_core::model::DictResult;
 use saladict_core::schema::ConfigField;
 use saladict_core::{Language, Result, TranslateRequest, TranslateResult};
+use saladict_net::NetErr as _;
 
 pub struct Ecdict;
 
@@ -39,12 +39,12 @@ impl Translator for Ecdict {
     }
 
     async fn translate(&self, req: TranslateRequest) -> Result<TranslateResult> {
-        let resp = saladict_net::post_with_headers(
-            ENDPOINT,
-            &[("Content-Type", "application/json")],
-        )
-        .json(&serde_json::json!({ "text": req.text }))
-        .send().await.net_err()?;
+        let resp =
+            saladict_net::post_with_headers(ENDPOINT, &[("Content-Type", "application/json")])
+                .json(&serde_json::json!({ "text": req.text }))
+                .send()
+                .await
+                .net_err()?;
         let resp = saladict_net::check(resp).await?;
         let result: serde_json::Value = resp.json().await.net_err()?;
 

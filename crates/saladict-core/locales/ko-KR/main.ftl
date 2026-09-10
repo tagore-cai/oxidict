@@ -55,6 +55,8 @@ config-saved-hint = Saved (some settings take effect after restart)
 config-title = Preferences
 important-notice = Important notice
 notify-error-open = Failed to open notify window
+notify-copied = 클립보드에 복사되었습니다
+notify-hidden = 번역 창이 숨겨졌습니다
 recognize-action = Recognize
 recognize-copy = Copy result
 recognize-image-bytes = Image { $bytes } bytes
@@ -96,3 +98,13 @@ updater-hint = Click "Check for updates" to see if there's a new version
 updater-latest-version = Latest version: { $version }
 updater-title = Check for updates
 updater-window-title = Saladict · Update
+
+## 托盘补充
+tray-auto-copy = 자동 복사
+tray-copy-source = 원문
+tray-copy-target = 번역문
+tray-copy-source-target = 원문+번역문
+tray-copy-disable = 닫기
+tray-check-update = 업데이트 확인
+tray-view-log = 로그 보기
+tray-restart = 응용 프로그램 다시 시작

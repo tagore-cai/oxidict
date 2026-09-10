@@ -54,7 +54,8 @@ config-move-down = 下移
 config-field-required = { $field } 不能为空
 config-field-unknown = 字段
 
-config-hotkey-hint = 全局快捷键（如 Command+T / Ctrl+Alt+X，留空禁用；修改后需保存）
+config-hotkey-hint = 全局快捷键（如 Command+T / Ctrl+Alt+X，留空禁用；录入即生效，Backspace 清空并注销）
+config-hotkey-conflict = 快捷键冲突：该组合键已被「{ $name }」占用
 config-hotkey-selection = 划词翻译
 config-hotkey-input = 输入翻译
 config-hotkey-ocr = 截图 OCR
@@ -62,6 +63,14 @@ config-hotkey-ocr-translate = 截图翻译
 
 config-clipboard-monitor = 监听剪切板
 config-dark-mode = 深色模式
+config-transparent = 窗口毛玻璃（新开窗口生效）
+config-dock-icon = 隐藏 Dock 图标（macOS）
+config-server-port = 服务器端口（重启生效）
+config-dev-mode = 开发者模式
+config-nav-history = 历史记录
+config-history-count = 共 { $count } 条记录
+config-history-empty = 暂无翻译历史
+config-history-clear = 清空历史
 config-proxy = HTTP 代理
 config-proxy-host = 代理主机
 config-proxy-port = 代理端口
@@ -95,6 +104,8 @@ tray-clipboard-captured = 剪切板捕获: { $count } 字符
 tray-clipboard-on = 剪切板监听已开启
 tray-error-icon-gen = 图标生成失败: { $err }
 notify-error-open = 打开通知窗口失败
+notify-copied = 已复制到剪贴板
+notify-hidden = 翻译窗口已隐藏
 updater-error-no-version = 未获取到版本信息
 updater-latest-version = 最新版本：{ $version }
 updater-hint = 点击「检查更新」查看是否有新版本
@@ -121,3 +132,13 @@ config-backup-saved = 已保存
 config-proxy-username = 代理用户名
 config-proxy-password = 代理密码
 config-no-proxy = 不走代理的主机
+
+## 托盘补充
+tray-auto-copy = 自动复制
+tray-copy-source = 原文
+tray-copy-target = 译文
+tray-copy-source-target = 原文+译文
+tray-copy-disable = 关闭
+tray-check-update = 检查更新
+tray-view-log = 查看日志
+tray-restart = 重启应用

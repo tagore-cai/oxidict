@@ -84,10 +84,7 @@ impl Translator for Ollama {
             }
             let chunk: Value = serde_json::from_str(line.trim())
                 .map_err(|e| Error::Service(format!("Ollama 流式响应解析失败: {e}")))?;
-            if let Some(delta) = chunk
-                .pointer("/message/content")
-                .and_then(|v| v.as_str())
-            {
+            if let Some(delta) = chunk.pointer("/message/content").and_then(|v| v.as_str()) {
                 target.push_str(delta);
                 if let Some(sink) = req.on_stream.as_ref() {
                     sink(format!("{}_", target));

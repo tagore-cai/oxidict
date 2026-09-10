@@ -7,11 +7,11 @@
 //! 响应解析同 OpenAI 兼容格式：`choices[0].message.content` / `choices[0].delta.content`。
 
 use crate::Translator;
-use saladict_core::HasConfig as _;
 use async_trait::async_trait;
 use futures::StreamExt;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
+use saladict_core::HasConfig as _;
 use saladict_core::{Error, Language, Result, TranslateRequest, TranslateResult};
 use serde_json::{json, Value};
 
@@ -122,10 +122,7 @@ impl Translator for DeeplCloud {
         ];
 
         let rb = saladict_net::post_with_headers(url, &headers).json(&body);
-        let resp = rb
-            .send()
-            .await
-            .map_err(|e| Error::Network(e.to_string()))?;
+        let resp = rb.send().await.map_err(|e| Error::Network(e.to_string()))?;
         let resp = saladict_net::check(resp).await?;
 
         // 流式：边解析 SSE 增量边推送。

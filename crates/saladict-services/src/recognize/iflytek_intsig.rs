@@ -4,15 +4,15 @@
 //! 复用讯飞 `iflytek_auth` 签名，接口为 `hh_ocr_recognize_doc`，结果取 `whole_text`。
 
 use crate::Recognizer;
-use saladict_core::HasConfig as _;
-use saladict_net::NetErr as _;
 use async_trait::async_trait;
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use chrono::Utc;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::{Error, Language, Result, RecognizeRequest};
+use saladict_core::HasConfig as _;
+use saladict_core::{Error, Language, RecognizeRequest, Result};
+use saladict_net::NetErr as _;
 use saladict_net::{check, hmac_sha256_base64, percent_encode, post_with_headers};
 use serde_json::Value;
 
@@ -22,7 +22,13 @@ const HOST: &str = "api.xf-yun.com";
 const PATH: &str = "/v1/private/hh_ocr_recognize_doc";
 const SERVICE: &str = "hh_ocr_recognize_doc";
 
-fn iflytek_auth(api_key: &str, api_secret: &str, host: &str, date: &str, request_line: &str) -> String {
+fn iflytek_auth(
+    api_key: &str,
+    api_secret: &str,
+    host: &str,
+    date: &str,
+    request_line: &str,
+) -> String {
     let signature_origin = format!("host: {}\ndate: {}\n{}", host, date, request_line);
     let signature = hmac_sha256_base64(api_secret.as_bytes(), &signature_origin);
     let authorization_origin = format!(
@@ -95,12 +101,18 @@ impl Recognizer for IflytekIntsig {
 
         let url = format!(
             "https://{}{}?authorization={}&host={}&date={}",
-            HOST, PATH, auth, HOST, percent_encode(&date)
+            HOST,
+            PATH,
+            auth,
+            HOST,
+            percent_encode(&date)
         );
 
         let resp = post_with_headers(&url, &[("content-type", "application/json")])
             .body(payload)
-            .send().await.net_err()?;
+            .send()
+            .await
+            .net_err()?;
         let data: Value = check(resp).await?.json().await.net_err()?;
 
         let text_b64 = data
@@ -110,7 +122,8 @@ impl Recognizer for IflytekIntsig {
             .and_then(|t| t.as_str())
             .ok_or_else(|| Error::Service("Result payload not found".into()))?;
         let text_string = String::from_utf8_lossy(
-            &B64.decode(text_b64).map_err(|e| Error::Service(format!("base64 解码失败: {e}")))?,
+            &B64.decode(text_b64)
+                .map_err(|e| Error::Service(format!("base64 解码失败: {e}")))?,
         )
         .to_string();
         let text_json: Value = serde_json::from_str(&text_string)

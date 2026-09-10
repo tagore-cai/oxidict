@@ -73,15 +73,13 @@ impl Translator for Volcengine {
         );
 
         let norm_query = format!("Action=TranslateText&Version={SERVICE_VERSION}");
-        let canonical_request = format!(
-            "POST\n/\n{norm_query}\n{canonical_headers}\n{signed_headers}\n{body_hash}"
-        );
+        let canonical_request =
+            format!("POST\n/\n{norm_query}\n{canonical_headers}\n{signed_headers}\n{body_hash}");
         let hashed_canonical = saladict_net::sha256_hex(canonical_request.as_bytes());
 
         let credential_scope = format!("{short_date}/{REGION}/{SERVICE}/request");
-        let string_to_sign = format!(
-            "HMAC-SHA256\n{format_date}\n{credential_scope}\n{hashed_canonical}"
-        );
+        let string_to_sign =
+            format!("HMAC-SHA256\n{format_date}\n{credential_scope}\n{hashed_canonical}");
 
         // 密钥派生链：kDate = HMAC(secret, date)，注意没有 AWS4 前缀。
         let k_date = saladict_net::hmac_sha256_raw(secret.as_bytes(), short_date.as_bytes());

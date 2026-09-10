@@ -5,11 +5,11 @@
 //! 请求体为纯字符串数组，`from` 被故意省略以让端点自动检测源语言。
 
 use crate::Translator;
-use saladict_net::NetErr as _;
 use async_trait::async_trait;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
 use saladict_core::{Error, Language, Result, TranslateRequest, TranslateResult};
+use saladict_net::NetErr as _;
 use saladict_net::{check, post_with_headers};
 use serde_json::Value;
 
@@ -83,14 +83,16 @@ impl Translator for Bing {
                 ("User-Agent", DEFAULT_EDGE_USER_AGENT),
             ],
         )
-        .json(&[req.text.clone()])
-        .send().await.net_err()?;
+        .json(std::slice::from_ref(&req.text))
+        .send()
+        .await
+        .net_err()?;
         let resp = check(resp).await?;
         let result: Value = resp.json().await.net_err()?;
 
         if let Some(arr) = result.as_array() {
             if let Some(text) = arr
-                .get(0)
+                .first()
                 .and_then(|v| v.get("translations"))
                 .and_then(|v| v.get(0))
                 .and_then(|v| v.get("text"))

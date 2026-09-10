@@ -3,18 +3,17 @@
 //! 对应原 `src/window/Notify`：一个 always-on-top 的小窗，显示一条消息，
 //! 3 秒后自动关闭，也可手动点关闭按钮立即关闭。
 
-use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
-use saladict_core::i18n::t;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::button::ButtonVariants as _;
-use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
 use gpui_kit::component::Root;
+use gpui_kit::component::{ActiveTheme, IconName, Sizable};
+use gpui_kit::AppContext as _;
 use gpui_kit::{
-    div, px, App, AsyncApp, Bounds, Context, FontWeight, IntoElement, InteractiveElement,
-    ParentElement, Point, Render, SharedString, Size, Styled, StatefulInteractiveElement,
-    TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions,
+    div, px, App, AsyncApp, Bounds, Context, FontWeight, IntoElement, ParentElement, Point, Render,
+    SharedString, Size, Styled, Window, WindowBounds, WindowKind, WindowOptions,
 };
+use saladict_core::i18n::t;
 use std::time::Duration;
 
 pub struct NotifyWindow {
@@ -32,7 +31,7 @@ impl Render for NotifyWindow {
         let theme = cx.theme();
         v_flex()
             .size_full()
-            .bg(theme.colors.background)
+            .bg(crate::window_root_bg(theme.colors.background))
             .text_color(theme.colors.foreground)
             .rounded_md()
             .p_3()
@@ -88,6 +87,7 @@ pub fn open_notify(cx: &mut App, message: String) {
         focus: true,
         show: true,
         kind: WindowKind::PopUp,
+        window_background: crate::window_background_appearance(),
         ..Default::default()
     };
 
@@ -96,12 +96,10 @@ pub fn open_notify(cx: &mut App, message: String) {
             let view = cx.new(|_cx| NotifyWindow::new(message.clone()));
             cx.new(|cx| Root::new(view, window, cx))
         })
-        .expect(t("notify-error-open").as_str());
+        .unwrap_or_else(|_| panic!("{}", t("notify-error-open")));
 
     cx.spawn(async move |cx: &mut AsyncApp| {
-        cx.background_executor()
-            .timer(Duration::from_secs(3))
-            .await;
+        cx.background_executor().timer(Duration::from_secs(3)).await;
         let _ = handle.update(cx, |_, window, _| {
             window.remove_window();
         });

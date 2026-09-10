@@ -12,7 +12,7 @@ pub fn system_ocr(image: &[u8], lang: Language) -> Result<String> {
         use windows::Graphics::Imaging::BitmapDecoder;
         use windows::Media::Ocr::OcrEngine;
         use windows::Storage::Streams::{
-            DataWriter, InMemoryRandomAccessStream, IRandomAccessStream,
+            DataWriter, IRandomAccessStream, InMemoryRandomAccessStream,
         };
 
         // 把图像字节灌入内存流，再解码为 SoftwareBitmap。

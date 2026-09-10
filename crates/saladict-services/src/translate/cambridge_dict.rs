@@ -49,9 +49,7 @@ fn inner_html(html: &str, class_pos: usize) -> Option<String> {
     let cls_end = html[cls_start..].find('"')? + cls_start;
     let gt = html[cls_end + 1..].find('>')? + cls_end + 1;
     let open_tag_start = html[..class_pos].rfind('<')?;
-    let tag_name = html[open_tag_start + 1..]
-        .split(|c| c == ' ' || c == '>')
-        .next()?;
+    let tag_name = html[open_tag_start + 1..].split([' ', '>']).next()?;
     let inner_start = gt + 1;
     let open = format!("<{}", tag_name);
     let close = format!("</{}>", tag_name);
@@ -237,15 +235,14 @@ impl Translator for CambridgeDict {
             // 释义块（.def-block.ddef_block）
             for def in elements_inner(entry, "ddef_block") {
                 // 跳过带 data-wl-senseid="panel" 的面板块
-                if def.contains("data-wl-senseid")
-                    && def.contains("panel")
-                {
+                if def.contains("data-wl-senseid") && def.contains("panel") {
                     continue;
                 }
                 let eng_def = text_of(&def, "ddef_d").unwrap_or_default();
-                let trait_ = word_pos.clone().filter(|w| !w.is_empty()).or_else(|| {
-                    Some(eng_def.replace(char::is_whitespace, " ").trim().to_string())
-                });
+                let trait_ = word_pos
+                    .clone()
+                    .filter(|w| !w.is_empty())
+                    .or_else(|| Some(eng_def.replace(char::is_whitespace, " ").trim().to_string()));
                 let mut explains = vec![eng_def];
                 if let Some(trans) = text_of(&def, "dtrans-se") {
                     for part in trans.split(';') {
@@ -255,10 +252,7 @@ impl Translator for CambridgeDict {
                         }
                     }
                 }
-                dict.explanations.push(Explanation {
-                    trait_,
-                    explains,
-                });
+                dict.explanations.push(Explanation { trait_, explains });
             }
 
             // 例句（第一个 .eg）

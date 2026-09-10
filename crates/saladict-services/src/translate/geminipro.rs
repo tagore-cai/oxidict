@@ -47,8 +47,8 @@ impl Translator for Geminipro {
     }
 
     async fn translate(&self, req: TranslateRequest) -> Result<TranslateResult> {
-        use saladict_net::NetErr as _;
         use futures::StreamExt;
+        use saladict_net::NetErr as _;
 
         let api_key = req.require_str("apiKey", "Gemini API Key")?;
         let stream = req.bool("stream");
@@ -74,8 +74,9 @@ impl Translator for Geminipro {
         // 提示词是 parts 结构，模板替换与 OpenAI 共享实现一致。
         let from = req.from.code().to_string();
         let to = req.to.code().to_string();
-        let detect = compat::language_display(req.detect.unwrap_or(req.from)).to_string();
-        let prompts: Vec<(String, String)> = compat::build_messages(&req, compat::prompts_from(&req));
+        let _detect = compat::language_display(req.detect.unwrap_or(req.from)).to_string();
+        let prompts: Vec<(String, String)> =
+            compat::build_messages(&req, compat::prompts_from(&req));
         let _ = (&from, &to);
 
         let contents: Vec<Value> = prompts

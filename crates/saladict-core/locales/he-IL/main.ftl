@@ -55,6 +55,8 @@ config-saved-hint = Saved (some settings take effect after restart)
 config-title = Preferences
 important-notice = Important notice
 notify-error-open = Failed to open notify window
+notify-copied = הועתק ללוח
+notify-hidden = חלון התרגום הוסתר
 recognize-action = Recognize
 recognize-copy = Copy result
 recognize-image-bytes = Image { $bytes } bytes
@@ -96,3 +98,13 @@ updater-hint = Click "Check for updates" to see if there's a new version
 updater-latest-version = ## הגרסה האחרונה מותקנת
 updater-title = חפש עדכונים
 updater-window-title = Saladict · Update
+
+## 托盘补充
+tray-auto-copy = העתקה אוטומטית
+tray-copy-source = מקור
+tray-copy-target = יעד
+tray-copy-source-target = מקור+יעד
+tray-copy-disable = כבה
+tray-check-update = בדוק עדכונים
+tray-view-log = הצג יומן
+tray-restart = הפעל מחדש

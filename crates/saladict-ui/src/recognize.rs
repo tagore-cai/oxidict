@@ -6,16 +6,16 @@
 //!
 //! 注意：三个薄窗口文件互不引用，各自独立。
 
-use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
 use gpui_kit::component::button::Button;
 use gpui_kit::component::button::ButtonVariants as _;
-use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
 use gpui_kit::component::Root;
+use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
+use gpui_kit::AppContext as _;
 use gpui_kit::{
-    div, px, App, AnyElement, Bounds, ClickEvent, ClipboardItem, Context, FontWeight, IntoElement,
-    InteractiveElement, ParentElement, Point, Render, SharedString, Size, Styled,
-    StatefulInteractiveElement, TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions,
+    div, px, AnyElement, App, Bounds, ClickEvent, ClipboardItem, Context, FontWeight,
+    InteractiveElement, IntoElement, ParentElement, Point, Render, SharedString, Size, Styled,
+    TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions,
 };
 use saladict_core::config::{config, keys};
 use saladict_core::i18n::{t, t_args};
@@ -82,20 +82,17 @@ impl RecognizeWindow {
                 match result {
                     Ok(Ok(mut text)) => {
                         // recognize_delete_newline
-                        if saladict_core::config::config().get_or(
-                            saladict_core::config::keys::RECOGNIZE_DELETE_NEWLINE,
-                            false,
-                        ) {
+                        if saladict_core::config::config()
+                            .get_or(saladict_core::config::keys::RECOGNIZE_DELETE_NEWLINE, false)
+                        {
                             text = text.replace('\n', " ");
                         }
                         this.text = text;
                         this.error = None;
-                        // recognize_auto_copy: 1=复制结果, 2=复制并翻译
-                        let auto = saladict_core::config::config().get_or(
-                            saladict_core::config::keys::RECOGNIZE_AUTO_COPY,
-                            4,
-                        );
-                        if auto == 1 || auto == 2 {
+                        // recognize_auto_copy（对齐原版 bool）：识别完成后复制结果。
+                        let auto = saladict_core::config::config()
+                            .get_or(saladict_core::config::keys::RECOGNIZE_AUTO_COPY, false);
+                        if auto {
                             cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(
                                 this.text.clone(),
                             ));

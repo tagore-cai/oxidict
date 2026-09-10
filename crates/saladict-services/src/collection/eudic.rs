@@ -70,8 +70,10 @@ impl Eudic {
             .await
             .map_err(net_err)?;
         let resp = saladict_net::check(resp).await?;
-        let result: serde_json::Value =
-            resp.json().await.map_err(|e| Error::Network(e.to_string()))?;
+        let result: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| Error::Network(e.to_string()))?;
 
         let data = result
             .get("data")
@@ -92,8 +94,10 @@ impl Eudic {
             .await
             .map_err(net_err)?;
         let create = saladict_net::check(create).await?;
-        let created: serde_json::Value =
-            create.json().await.map_err(|e| Error::Network(e.to_string()))?;
+        let created: serde_json::Value = create
+            .json()
+            .await
+            .map_err(|e| Error::Network(e.to_string()))?;
         created
             .get("data")
             .and_then(|v| v.get("id"))
@@ -118,8 +122,10 @@ impl Eudic {
             .await
             .map_err(net_err)?;
         let resp = saladict_net::check(resp).await?;
-        let result: serde_json::Value =
-            resp.json().await.map_err(|e| Error::Network(e.to_string()))?;
+        let result: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| Error::Network(e.to_string()))?;
         match result.get("message").and_then(|v| v.as_str()) {
             Some(_) => Ok(()),
             None => Err(Error::Service("加入单词失败".into())),

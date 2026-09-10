@@ -7,10 +7,10 @@
 use crate::Recognizer;
 use async_trait::async_trait;
 use base64::Engine as _;
-use saladict_core::HasConfig as _;
 use saladict_core::map_language;
 use saladict_core::schema::ConfigField;
-use saladict_core::{Error, Language, Result, RecognizeRequest};
+use saladict_core::HasConfig as _;
+use saladict_core::{Error, Language, RecognizeRequest, Result};
 use saladict_net::{post_with_headers, sha256_hex, tc3_sign};
 use serde_json::Value;
 
@@ -59,13 +59,18 @@ impl Recognizer for TencentAccurate {
 
         let canonical_headers = format!("content-type:application/json\nhost:{ENDPOINT}\n");
         let signed_headers = "content-type;host";
-        let canonical_request = format!(
-            "POST\n/\n\n{canonical_headers}\n{signed_headers}\n{hashed_payload}"
-        );
+        let canonical_request =
+            format!("POST\n/\n\n{canonical_headers}\n{signed_headers}\n{hashed_payload}");
 
         let credential_scope = format!("{date}/{SERVICE}/tc3_request");
         let string_to_sign_prefix = format!("TC3-HMAC-SHA256\n{timestamp}\n{credential_scope}");
-        let signature = tc3_sign(&secret_key, &date, SERVICE, &canonical_request, &string_to_sign_prefix);
+        let signature = tc3_sign(
+            &secret_key,
+            &date,
+            SERVICE,
+            &canonical_request,
+            &string_to_sign_prefix,
+        );
 
         let authorization = format!(
             "TC3-HMAC-SHA256 Credential={secret_id}/{credential_scope}, SignedHeaders={signed_headers}, Signature={signature}"
@@ -90,10 +95,7 @@ impl Recognizer for TencentAccurate {
 
         let status = resp.status();
         if !status.is_success() {
-            let body = resp
-                .text()
-                .await
-                .unwrap_or_default();
+            let body = resp.text().await.unwrap_or_default();
             return Err(Error::Service(format!(
                 "Http Request Error\nHttp Status: {}\n{}",
                 status.as_u16(),
@@ -121,7 +123,9 @@ impl Recognizer for TencentAccurate {
                 }
                 Ok(target.trim().to_string())
             }
-            None => Err(Error::Service(serde_json::to_string(&result).unwrap_or_default())),
+            None => Err(Error::Service(
+                serde_json::to_string(&result).unwrap_or_default(),
+            )),
         }
     }
 }

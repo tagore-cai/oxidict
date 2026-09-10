@@ -43,7 +43,9 @@ pub fn system_ocr(image: &[u8], lang: Language) -> Result<String> {
             .output();
 
         match output {
-            Ok(o) if o.status.success() => Ok(String::from_utf8_lossy(&o.stdout).trim().to_string()),
+            Ok(o) if o.status.success() => {
+                Ok(String::from_utf8_lossy(&o.stdout).trim().to_string())
+            }
             Ok(o) => Err(anyhow::anyhow!(
                 "OCR helper `{bin}` error: {}",
                 String::from_utf8_lossy(&o.stderr).trim()

@@ -5,10 +5,10 @@
 //! 为 `azure` 类时使用 `api-key` 头。
 
 use super::openai_compatible as compat;
-use saladict_core::HasConfig as _;
 use crate::Translator;
 use async_trait::async_trait;
 use saladict_core::schema::ConfigField;
+use saladict_core::HasConfig as _;
 use saladict_core::{Result, TranslateRequest, TranslateResult};
 
 pub struct Openai;
@@ -95,12 +95,8 @@ impl Translator for Openai {
             .unwrap_or_else(|| serde_json::from_str(DEFAULT_ARGUMENTS).unwrap());
         let body = compat::build_body(&model, stream, &messages, extra);
 
-        let headers: Vec<(&str, &str)> = headers
-            .iter()
-            .map(|(k, v)| (*k, v.as_str()))
-            .collect();
+        let headers: Vec<(&str, &str)> = headers.iter().map(|(k, v)| (*k, v.as_str())).collect();
 
-        compat::chat_completions(&url, &headers, body, stream, req.on_stream.as_ref())
-            .await
+        compat::chat_completions(&url, &headers, body, stream, req.on_stream.as_ref()).await
     }
 }
