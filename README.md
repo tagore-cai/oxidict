@@ -12,6 +12,33 @@ cargo run -p oxidict          # 内核模式：配置 + 服务 + 剪切板/快�
 cargo check --workspace        # 全量编译检查（当前 0 error）
 ```
 
+## 构建要求
+
+- 工具链由 `rust-toolchain.toml` 钉死（1.98.1 + rustfmt + clippy），rustup 会自动安装对应版本
+- macOS 10.15+，需 Xcode Command Line Tools
+- 平台支持：macOS 已编译验证；Windows / Linux 分支就绪待目标机器验证
+
+## 打包（macOS）
+
+```bash
+./scripts/bundle.sh            # 产出 target/release/bundle/macos/Oxidict.app
+# 制作 dmg：
+hdiutil create -srcfolder target/release/bundle/macos/Oxidict.app \
+  -volname Oxidict target/release/bundle/Oxidict.dmg
+```
+
+说明：
+
+- 脚本内部执行 `cargo build --release -p oxidict`，再按 `Info.plist` 组装 `.app`
+- 应用图标缺失时自动降级为系统默认图标；要自定义图标，把 `icon.icns`
+  放到 `assets/icon.icns`（可用 `iconutil -c icns` 从 iconset 生成）
+- 未做 codesign / 公证：首次打开需右键 → 打开，绕过 Gatekeeper 提示
+
+## 开源协议
+
+[MIT](./LICENSE)。本项目为原 Saladict 的独立 Rust 重写：未复用原版代码，
+仅兼容其 `config.json`、历史库结构与 `.potext` 插件包格式。
+
 ## 分层
 
 ```

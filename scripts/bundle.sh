@@ -12,8 +12,15 @@ rm -rf "$APP_DIR"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 echo "[3/4] 拷贝文件"
 cp target/release/oxidict "$CONTENTS/MacOS/oxidict"
-cp /Users/tagore/Desktop/oxidict/src-tauri/icons/icon.icns "$CONTENTS/Resources/icon.icns"
 cp Info.plist "$CONTENTS/Info.plist"
+if [ -f "assets/icon.icns" ]; then
+  cp assets/icon.icns "$CONTENTS/Resources/icon.icns"
+else
+  echo "warn: assets/icon.icns 不存在，使用系统默认图标"
+  echo "      生成方式：把 1024x1024 png 放入临时目录，执行"
+  echo "      iconutil -c icns assets/icon.iconset -o assets/icon.icns"
+  /usr/libexec/PlistBuddy -c "Delete :CFBundleIconFile" "$CONTENTS/Info.plist" 2>/dev/null || true
+fi
 echo -n "APPL????" > "$CONTENTS/PkgInfo"
 echo "[4/4] 完成"
 echo ""
