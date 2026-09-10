@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""统计 saladict-rs 项目关键指标，用于上下文压缩时的状态快照。
+"""统计 oxidict-rs 项目关键指标，用于上下文压缩时的状态快照。
 """
 import pathlib, re
 
 root = pathlib.Path(__file__).resolve().parent.parent
 
 # 1. 服务注册数
-svc = root / "crates" / "saladict-services" / "src"
+svc = root / "crates" / "oxidict-services" / "src"
 counts = {}
 for mod in sorted(svc.glob("*/mod.rs")):
     kind = mod.parent.name
@@ -18,22 +18,22 @@ total = sum(counts.values())
 print("服务注册数:", counts, "总计:", total)
 
 # 2. 语言
-loc = root / "crates" / "saladict-core" / "locales"
+loc = root / "crates" / "oxidict-core" / "locales"
 langs = sorted(d.name for d in loc.iterdir() if d.is_dir())
 print(f"语言: {len(langs)} 种: {langs}")
 
 # 3. config keys
-cfg = (root / "crates" / "saladict-core" / "src" / "config.rs").read_text()
+cfg = (root / "crates" / "oxidict-core" / "src" / "config.rs").read_text()
 pat = r'pub const (\w+): &str = "([^"]+)"'
 keys = sorted(set(re.findall(pat, cfg)))
 print(f"config keys: {len(keys)}")
 
 # 4. UI 模块
-ui = root / "crates" / "saladict-ui" / "src"
+ui = root / "crates" / "oxidict-ui" / "src"
 print("UI 模块:", sorted(f.stem for f in ui.glob("*.rs")))
 
 # 5. 平台模块
-plat = root / "crates" / "saladict-platform" / "src"
+plat = root / "crates" / "oxidict-platform" / "src"
 print("platform 模块:", sorted(f.stem for f in plat.glob("*.rs")))
 
 # 6. 代码量

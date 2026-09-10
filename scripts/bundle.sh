@@ -1,18 +1,18 @@
 #!/bin/bash
 set -euo pipefail
-APP_NAME="Saladict"
+APP_NAME="Oxidict"
 BUNDLE="target/release/bundle/macos"
 APP_DIR="$BUNDLE/$APP_NAME.app"
 CONTENTS="$APP_DIR/Contents"
 echo "=== 构建 .app Bundle ==="
 echo "[1/4] cargo build --release"
-cargo build --release -p saladict 2>&1 | tail -1
+cargo build --release -p oxidict 2>&1 | tail -1
 echo "[2/4] 创建 Bundle 目录"
 rm -rf "$APP_DIR"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 echo "[3/4] 拷贝文件"
-cp target/release/saladict "$CONTENTS/MacOS/saladict"
-cp /Users/tagore/Desktop/saladict/src-tauri/icons/icon.icns "$CONTENTS/Resources/icon.icns"
+cp target/release/oxidict "$CONTENTS/MacOS/oxidict"
+cp /Users/tagore/Desktop/oxidict/src-tauri/icons/icon.icns "$CONTENTS/Resources/icon.icns"
 cp Info.plist "$CONTENTS/Info.plist"
 echo -n "APPL????" > "$CONTENTS/PkgInfo"
 echo "[4/4] 完成"
@@ -20,4 +20,4 @@ echo ""
 echo "Bundle: $APP_DIR"
 du -sh "$APP_DIR"
 echo "启动: open $APP_DIR"
-echo "制作 dmg: hdiutil create -srcfolder $APP_DIR -volname Saladict target/release/bundle/Saladict.dmg"
+echo "制作 dmg: hdiutil create -srcfolder $APP_DIR -volname Oxidict target/release/bundle/Oxidict.dmg"

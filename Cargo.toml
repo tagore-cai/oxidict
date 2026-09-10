@@ -6,17 +6,17 @@ members = ["crates/*", "app"]
 version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-only"
-repository = "https://github.com/allentown521/saladict"
+repository = "https://github.com/allentown521/oxidict"
 
 [workspace.dependencies]
 # ---- internal crates ----
-saladict-core = { path = "crates/saladict-core" }
-saladict-net = { path = "crates/saladict-net" }
-saladict-platform = { path = "crates/saladict-platform" }
-saladict-services = { path = "crates/saladict-services" }
-saladict-plugin = { path = "crates/saladict-plugin" }
-saladict-server = { path = "crates/saladict-server" }
-saladict-ui = { path = "crates/saladict-ui" }
+oxidict-core = { path = "crates/oxidict-core" }
+oxidict-net = { path = "crates/oxidict-net" }
+oxidict-platform = { path = "crates/oxidict-platform" }
+oxidict-services = { path = "crates/oxidict-services" }
+oxidict-plugin = { path = "crates/oxidict-plugin" }
+oxidict-server = { path = "crates/oxidict-server" }
+oxidict-ui = { path = "crates/oxidict-ui" }
 
 # ---- async / runtime ----
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "fs"] }
@@ -134,7 +134,7 @@ gpui-kit = { version = "0.6.1", features = [
 
 # ---- platform-specific (only linked on the matching target) ----
 # 注意：virtual workspace manifest 不允许 [target] 区块，平台特定依赖
-# 写在各成员 crate 的 Cargo.toml 里（如 saladict-platform 的 objc2-app-kit）。
+# 写在各成员 crate 的 Cargo.toml 里（如 oxidict-platform 的 objc2-app-kit）。
 
 # ---- 统一 lint 基线（各成员 crate 通过 [lints] workspace = true 接入）----
 # 目的：把「fmt/clippy 干净」从口头纪律变成清单内的强制约束，CI 再用 -D warnings 收口。

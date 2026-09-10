@@ -1,0 +1,19 @@
+[package]
+name = "oxidict-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+oxidict-core.workspace = true
+tiny_http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+log.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

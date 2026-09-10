@@ -1,18 +1,18 @@
 [package]
-name = "saladict"
+name = "oxidict"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
-saladict-core.workspace = true
-saladict-net.workspace = true
-saladict-platform.workspace = true
-saladict-services.workspace = true
-saladict-plugin.workspace = true
-saladict-server.workspace = true
-saladict-ui.workspace = true
+oxidict-core.workspace = true
+oxidict-net.workspace = true
+oxidict-platform.workspace = true
+oxidict-services.workspace = true
+oxidict-plugin.workspace = true
+oxidict-server.workspace = true
+oxidict-ui.workspace = true
 fern.workspace = true
 chrono.workspace = true
 log.workspace = true

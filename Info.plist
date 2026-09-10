@@ -5,17 +5,17 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>zh_CN</string>
     <key>CFBundleDisplayName</key>
-    <string>沙拉翻译</string>
+    <string>Oxidict</string>
     <key>CFBundleExecutable</key>
-    <string>saladict</string>
+    <string>oxidict</string>
     <key>CFBundleIconFile</key>
     <string>icon.icns</string>
     <key>CFBundleIdentifier</key>
-    <string>net.saladict.app</string>
+    <string>net.oxidict.app</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Saladict</string>
+    <string>Oxidict</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -31,7 +31,7 @@
     <key>NSAccessibilityUsageDescription</key>
     <string>沙拉翻译需要辅助功能权限来读取选中的文本。</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>沙拉翻译需要控制系统事件以实现全局快捷键和文本模拟。</string>
+    <string>Oxidict 需要控制系统事件以实现全局快捷键和文本模拟。</string>
     <key>LSUIElement</key>
     <false/>
 </dict>

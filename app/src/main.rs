@@ -1,27 +1,27 @@
-//! saladict：gpui-kit + Rust 重写版的可执行入口。
+//! oxidict：gpui-kit + Rust 重写版的可执行入口。
 //!
 //! 启动顺序：配置装载 -> 内置服务注册 -> 外部调用 HTTP 服务（独立线程）->
 //! 剪切板监听与全局快捷键 -> GPUI 主窗口（阻塞在事件循环上）。
 
-use saladict_core::config::ConfigStore;
-use saladict_core::{Result, TranslateRequest, TranslateResult};
+use oxidict_core::config::ConfigStore;
+use oxidict_core::{Result, TranslateRequest, TranslateResult};
 use std::sync::Arc;
 
 /// 用启用列表里的第一个实例翻译一段文本，并按需写入历史库。
 ///
 /// CLI 与本地 HTTP 服务共用这一个入口：服务选择交给
-/// [`saladict_services::translate_first_enabled_blocking`]，本函数只负责
+/// [`oxidict_services::translate_first_enabled_blocking`]，本函数只负责
 /// 组装请求与写历史。
 fn translate_once(req: TranslateRequest) -> Result<(String, TranslateResult)> {
-    let store = saladict_core::config::config();
+    let store = oxidict_core::config::config();
     let from = req.from;
     let to = req.to;
     let text = req.text.clone();
-    let (instance, result) = saladict_services::translate_first_enabled_blocking(req)?;
+    let (instance, result) = oxidict_services::translate_first_enabled_blocking(req)?;
 
     // 写入历史库（history_disable 为 true 时跳过）。
-    if !store.get_or(saladict_core::config::keys::HISTORY_DISABLE, false) {
-        let _ = saladict_core::history::History::global().add(
+    if !store.get_or(oxidict_core::config::keys::HISTORY_DISABLE, false) {
+        let _ = oxidict_core::history::History::global().add(
             &text,
             from.code(),
             to.code(),
@@ -34,10 +34,10 @@ fn translate_once(req: TranslateRequest) -> Result<(String, TranslateResult)> {
 
 fn run_cli_translate(text: &str) {
     ConfigStore::init().expect("初始化配置失败");
-    saladict_services::init_builtin_services();
-    saladict_core::history::History::init_default().expect("历史库初始化失败");
+    oxidict_services::init_builtin_services();
+    oxidict_core::history::History::init_default().expect("历史库初始化失败");
 
-    let store = saladict_core::config::config();
+    let store = oxidict_core::config::config();
     let req = TranslateRequest::new(text, store.source_language(), store.target_language());
     match translate_once(req) {
         Ok((instance, result)) => {
@@ -51,19 +51,19 @@ fn run_cli_translate(text: &str) {
 }
 
 /// 日志初始化：RUST_LOG 过滤（缺省 warn），stdout + 文件双输出。
-/// 文件落在 `<config_dir>/<APP_ID>/logs/saladict.log`，托盘「查看日志」即打开该目录。
+/// 文件落在 `<config_dir>/<APP_ID>/logs/oxidict.log`，托盘「查看日志」即打开该目录。
 fn init_logger() {
     let level = std::env::var("RUST_LOG")
         .ok()
         .and_then(|s| s.parse::<log::LevelFilter>().ok())
         .unwrap_or(log::LevelFilter::Warn);
-    let log_dir = saladict_core::config::default_app_dir()
+    let log_dir = oxidict_core::config::default_app_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
         .join("logs");
     if let Err(e) = std::fs::create_dir_all(&log_dir) {
         eprintln!("日志目录创建失败: {e}");
     }
-    let file = fern::log_file(log_dir.join("saladict.log")).ok();
+    let file = fern::log_file(log_dir.join("oxidict.log")).ok();
     let dispatch = fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -106,9 +106,9 @@ fn process_alive(pid: u32) -> bool {
 /// Windows 上 `libc` 不提供 `kill`，这里保守判定为「存活」。
 ///
 /// 后果：进程崩溃残留的锁文件不会被自动清理，需用户手工删除
-/// `<runtime_dir>/saladict-app.lock`。要做到与 Unix 对等，需在 `app` 引入
+/// `<runtime_dir>/oxidict-app.lock`。要做到与 Unix 对等，需在 `app` 引入
 /// `windows` crate，用 `OpenProcess` + `GetExitCodeProcess` 判定
-/// `STILL_ACTIVE`（本仓库的 windows 依赖目前只在 saladict-platform 里）。
+/// `STILL_ACTIVE`（本仓库的 windows 依赖目前只在 oxidict-platform 里）。
 #[cfg(not(unix))]
 fn process_alive(_pid: u32) -> bool {
     true
@@ -117,7 +117,7 @@ fn process_alive(_pid: u32) -> bool {
 fn main() {
     init_logger();
 
-    // 0. CLI 模式：`saladict --translate "文本"` 直接翻译并输出，用于端到端验证。
+    // 0. CLI 模式：`oxidict --translate "文本"` 直接翻译并输出，用于端到端验证。
     let args: Vec<String> = std::env::args().collect();
     if args.len() >= 3 && args[1] == "--translate" {
         run_cli_translate(&args[2]);
@@ -125,7 +125,7 @@ fn main() {
     }
 
     // 0.5 单实例保护：锁文件 + PID 检测（脏锁自动清理）。
-    let lock_path = saladict_core::config::runtime_lock_path();
+    let lock_path = oxidict_core::config::runtime_lock_path();
     let lock_created = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -157,7 +157,7 @@ fn main() {
                     std::process::exit(0);
                 }
             } else {
-                eprintln!("检测到另一个 saladict 实例正在运行，退出。");
+                eprintln!("检测到另一个 oxidict 实例正在运行，退出。");
                 std::process::exit(0);
             }
         }
@@ -167,25 +167,25 @@ fn main() {
     let store = ConfigStore::init().expect("初始化配置失败");
 
     // 1.2 语言：按 app_language 初始化 Fluent 本地化。
-    saladict_core::i18n::init_from_config();
+    oxidict_core::i18n::init_from_config();
     log::info!("配置目录: {}", store.app_dir().display());
 
     // 1.3 Dock 图标：按 hide_dock_icon 应用（macOS Accessory 策略；主线程）。
-    saladict_platform::dock::apply_from_config();
+    oxidict_platform::dock::apply_from_config();
 
     // 1.5 历史库：与老版本同一个 history.db。
-    saladict_core::history::History::init_default().expect("历史库初始化失败");
+    oxidict_core::history::History::init_default().expect("历史库初始化失败");
 
     // 2. 注册内置服务（翻译 30 / OCR 15 / TTS 3 / 生词本 2）。
-    saladict_services::init_builtin_services();
+    oxidict_services::init_builtin_services();
 
     // 2.5 加载已安装的 .potext 插件（headless QuickJS VM，不依赖窗口）。
-    let plugin_loaded = saladict_plugin::load_installed(&store);
+    let plugin_loaded = oxidict_plugin::load_installed(&store);
     if !plugin_loaded.is_empty() {
         log::info!("插件加载成功: {:?}", plugin_loaded);
     }
 
-    let services = saladict_services::services();
+    let services = oxidict_services::services();
     log::info!(
         "内置服务就绪: translate {} / recognize {} / tts {} / collection {}",
         services.translators().len(),
@@ -196,13 +196,13 @@ fn main() {
 
     // 3. 外部调用 HTTP 服务（tiny_http 阻塞线程，翻译回调走全局 tokio runtime）。
     //    回调与 CLI 走同一个 [`translate_once`]：服务选择、历史写入只有一份实现。
-    let ctx = saladict_server::ServerContext::new(
-        Arc::new(saladict_platform::selection::selected_text),
+    let ctx = oxidict_server::ServerContext::new(
+        Arc::new(oxidict_platform::selection::selected_text),
         Arc::new(|req: TranslateRequest| -> Result<TranslateResult> {
             translate_once(req).map(|(_instance, result)| result)
         }),
     );
-    if let Err(e) = saladict_server::start_from_config(ctx) {
+    if let Err(e) = oxidict_server::start_from_config(ctx) {
         // 端口被占用（例如老版本同时在跑）不应阻塞主程序。
         log::warn!("外部调用服务未启动: {e}");
     }
@@ -211,44 +211,44 @@ fn main() {
     // 统一通过托盘命令 channel 桥接：热键/托盘菜单/配置开关都只负责「发命令」，
     // 真正的状态变更在 GPUI 命令循环里执行，保证都在 GPUI 执行器上。
     let (tray_tx, tray_rx) =
-        tokio::sync::mpsc::unbounded_channel::<saladict_ui::tray::TrayCommand>();
+        tokio::sync::mpsc::unbounded_channel::<oxidict_ui::tray::TrayCommand>();
 
     // 配置开关：开机若已启用剪切板监听，发一条 ToggleClipboardMonitor 让循环去开。
-    if store.get_or(saladict_core::config::keys::CLIPBOARD_MONITOR, false) {
-        let _ = tray_tx.send(saladict_ui::tray::TrayCommand::ToggleClipboardMonitor);
+    if store.get_or(oxidict_core::config::keys::CLIPBOARD_MONITOR, false) {
+        let _ = tray_tx.send(oxidict_ui::tray::TrayCommand::ToggleClipboardMonitor);
         log::info!("已请求开启剪切板监听");
     }
     for (name, cfg_key) in [
         (
             "selection_translate",
-            saladict_core::config::keys::HOTKEY_SELECTION_TRANSLATE,
+            oxidict_core::config::keys::HOTKEY_SELECTION_TRANSLATE,
         ),
         (
             "input_translate",
-            saladict_core::config::keys::HOTKEY_INPUT_TRANSLATE,
+            oxidict_core::config::keys::HOTKEY_INPUT_TRANSLATE,
         ),
         (
             "ocr_recognize",
-            saladict_core::config::keys::HOTKEY_OCR_RECOGNIZE,
+            oxidict_core::config::keys::HOTKEY_OCR_RECOGNIZE,
         ),
         (
             "ocr_translate",
-            saladict_core::config::keys::HOTKEY_OCR_TRANSLATE,
+            oxidict_core::config::keys::HOTKEY_OCR_TRANSLATE,
         ),
     ] {
         if let Some(keys) = store.get::<String>(cfg_key).filter(|s| !s.is_empty()) {
-            // 生效链路唯一入口：映射与注册都在 saladict_ui::hotkey 内，
+            // 生效链路唯一入口：映射与注册都在 oxidict_ui::hotkey 内，
             // 设置窗口改键后热更新走的也是同一个函数。
-            saladict_ui::hotkey::apply_hotkey(name, &keys);
+            oxidict_ui::hotkey::apply_hotkey(name, &keys);
         }
     }
 
     // 5. GPUI 事件循环（阻塞主线程直到退出）。
     //    自定义资产源：先查品牌 logo，找不到回退 gpui-kit 内建资产。
     gpui_kit::application()
-        .with_assets(saladict_ui::logos::CombinedAssets::new())
+        .with_assets(oxidict_ui::logos::CombinedAssets::new())
         .run(move |cx| {
             gpui_kit::init(cx);
-            saladict_ui::launch(cx, tray_tx, tray_rx);
+            oxidict_ui::launch(cx, tray_tx, tray_rx);
         });
 }

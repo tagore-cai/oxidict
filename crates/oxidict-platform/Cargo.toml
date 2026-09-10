@@ -1,0 +1,40 @@
+[package]
+name = "oxidict-platform"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+oxidict-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+log.workspace = true
+image.workspace = true
+arboard.workspace = true
+selection.workspace = true
+keytap.workspace = true
+once_cell.workspace = true
+parking_lot.workspace = true
+lingua.workspace = true
+dirs.workspace = true
+
+# cross-platform capture / pointer (compiled on every target)
+screenshots.workspace = true
+mouse_position.workspace = true
+
+# Windows-only system OCR
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Dock 图标可见性（hide_dock_icon）：NSApplication setActivationPolicy。
+# MainThreadMarker 来自 objc2 本体；virtual workspace manifest 不能放
+# [target] 区块，故版本写在本 crate。
+objc2 = { version = "0.6", default-features = false, features = ["std"] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication"] }
+
+[lints]
+workspace = true

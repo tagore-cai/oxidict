@@ -7207,7 +7207,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
-name = "saladict"
+name = "oxidict"
 version = "0.1.0"
 dependencies = [
  "chrono",
@@ -7215,18 +7215,18 @@ dependencies = [
  "gpui-kit",
  "libc",
  "log",
- "saladict-core",
- "saladict-net",
- "saladict-platform",
- "saladict-plugin",
- "saladict-server",
- "saladict-services",
- "saladict-ui",
+ "oxidict-core",
+ "oxidict-net",
+ "oxidict-platform",
+ "oxidict-plugin",
+ "oxidict-server",
+ "oxidict-services",
+ "oxidict-ui",
  "tokio",
 ]
 
 [[package]]
-name = "saladict-core"
+name = "oxidict-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -7249,7 +7249,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "saladict-net"
+name = "oxidict-net"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -7264,7 +7264,7 @@ dependencies = [
  "parking_lot",
  "rand 0.8.8",
  "reqwest",
- "saladict-core",
+ "oxidict-core",
  "serde",
  "serde_json",
  "sha1",
@@ -7277,7 +7277,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "saladict-platform"
+name = "oxidict-platform"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -7292,7 +7292,7 @@ dependencies = [
  "objc2-app-kit 0.3.2",
  "once_cell",
  "parking_lot",
- "saladict-core",
+ "oxidict-core",
  "screenshots",
  "selection",
  "serde",
@@ -7302,7 +7302,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "saladict-plugin"
+name = "oxidict-plugin"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -7312,9 +7312,9 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "rquickjs",
- "saladict-core",
- "saladict-net",
- "saladict-services",
+ "oxidict-core",
+ "oxidict-net",
+ "oxidict-services",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -7324,12 +7324,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "saladict-server"
+name = "oxidict-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "log",
- "saladict-core",
+ "oxidict-core",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -7338,7 +7338,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "saladict-services"
+name = "oxidict-services"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -7356,9 +7356,9 @@ dependencies = [
  "rand 0.8.8",
  "reqwest",
  "rqrr",
- "saladict-core",
- "saladict-net",
- "saladict-platform",
+ "oxidict-core",
+ "oxidict-net",
+ "oxidict-platform",
  "serde",
  "serde_json",
  "sha1",
@@ -7370,18 +7370,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "saladict-ui"
+name = "oxidict-ui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
  "gpui-kit",
  "log",
- "saladict-core",
- "saladict-net",
- "saladict-platform",
- "saladict-plugin",
- "saladict-services",
+ "oxidict-core",
+ "oxidict-net",
+ "oxidict-platform",
+ "oxidict-plugin",
+ "oxidict-services",
  "serde",
  "serde_json",
  "tokio",
