@@ -170,8 +170,11 @@ fn main() {
     oxidict_core::i18n::init_from_config();
     log::info!("配置目录: {}", store.app_dir().display());
 
-    // 1.3 Dock 图标：按 hide_dock_icon 应用（macOS Accessory 策略；主线程）。
-    oxidict_platform::dock::apply_from_config();
+    // 1.3 Dock 图标（hide_dock_icon）不在此处应用：它需要 NSApplication，
+    //     而 GPUI 的 macOS 平台会把自己注册的 GPUIApplication（NSApplication 子类，
+    //     带 `platform` ivar）作为共享实例；若在此之前取 sharedApplication，
+    //     AppKit 会先创建出原生 NSApplication 单例，随后 GPUI 设置 ivar 时 panic
+    //     （Ivar platform not found on class NSApplication）。故移到 GPUI 回调内。
 
     // 1.5 历史库：与老版本同一个 history.db。
     oxidict_core::history::History::init_default().expect("历史库初始化失败");
@@ -249,6 +252,9 @@ fn main() {
         .with_assets(oxidict_ui::logos::CombinedAssets::new())
         .run(move |cx| {
             gpui_kit::init(cx);
+            // Dock 策略要在窗口创建前落地；此时 GPUI 已接管 NSApplication 共享实例，
+            // 见上面 1.3 的说明（早于 .run() 调用会 panic）。
+            oxidict_platform::dock::apply_from_config();
             oxidict_ui::launch(cx, tray_tx, tray_rx);
         });
 }

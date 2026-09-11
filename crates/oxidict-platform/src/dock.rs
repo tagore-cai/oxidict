@@ -9,9 +9,20 @@
 //!
 //! # 线程约定
 //!
-//! `setActivationPolicy` 必须在主线程调用。调用点只有两处：main 启动序列
-//! （主线程）与 GPUI 事件循环回调（也在主线程），见 [`set_visible`] 内的
+//! `setActivationPolicy` 必须在主线程调用。调用点只有两处：GPUI 事件循环回调
+//! （主线程）与配置页开关（同样在 GPUI 回调内），见 [`set_visible`] 内的
 //! 主线程检查兜底。
+//!
+//! # 时序约定（重要）
+//!
+//! **不得在 GPUI `Application::run` 之前调用本模块**。GPUI 的 macOS 平台通过
+//! `+[GPUIApplication sharedApplication]` 把共享实例创建为自己注册的
+//! NSApplication 子类（该类带 `platform` ivar，用于回取 MacPlatform 指针）。
+//! 若此前任何代码先取过 `NSApplication::sharedApplication`（本模块的
+//! `setActivationPolicy` 就会），AppKit 会先创建出**原生 NSApplication** 单例，
+//! 之后 GPUI 执行 `set_ivar("platform", ..)` 时 panic：
+//! `Ivar platform not found on class NSApplication`。
+//! 因此 Dock 策略在 GPUI 启动回调（`app/src/main.rs` 的 `.run(|cx| ..)`）内应用。
 
 /// 设置 Dock 图标可见性。
 ///

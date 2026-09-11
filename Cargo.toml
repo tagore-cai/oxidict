@@ -85,7 +85,7 @@ selection = "1.2"
 # 全局键盘监听（观察流制）：macOS CGEventTap / Windows WH_KEYBOARD_LL / Linux evdev。
 # 替换 global-hotkey：其 Linux 后端仅 x11-dl，Wayland（Ubuntu 22.04+/Fedora 默认）下失效。
 keytap = "0.4"
-tray-icon = "0.24.2"
+tray-icon = "0.24"
 # cross-platform capture / pointer
 screenshots = "0.8"
 mouse_position = "0.1"
@@ -123,7 +123,7 @@ unic-langid = "0.9"
 # 直接驱动：无窗口、无渲染循环依赖，CLI / HTTP / UI 全上下文可调用。
 # `futures` 提供 AsyncRuntime 与 Rust future <-> JS Promise 互转；
 # `loader` 提供 FileResolver/BuiltinLoader 等模块加载设施。
-rquickjs = { version = "0.8", features = ["futures", "loader"] }
+rquickjs = { version = "0.13", features = ["futures", "loader"] }
 zip = { version = "8.6", default-features = false, features = ["deflate"] }
 walkdir = "2.5"
 

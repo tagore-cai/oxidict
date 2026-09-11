@@ -196,12 +196,15 @@ async fn call_plugin(vms: &HashMap<String, PluginVm>, req: CallRequest) -> Resul
         ..
     } = req;
 
-    rquickjs::async_with!(vm.ctx.clone() => |ctx| {
+    // rquickjs 0.13 起 `async_with!` 宏被标记废弃，直接调用
+    // `AsyncContext::async_with`（宏本身只是它的展开，闭包接收 owned `Ctx`）。
+    rquickjs::AsyncContext::async_with(&vm.ctx, async |ctx| {
         let options = Object::new(ctx.clone()).map_err(|e| plugin_js_error(&ctx, e))?;
         options
             .set(
                 "config",
-                host::json_to_js(&ctx, &Json::Object(config)).map_err(|e| plugin_js_error(&ctx, e))?,
+                host::json_to_js(&ctx, &Json::Object(config))
+                    .map_err(|e| plugin_js_error(&ctx, e))?,
             )
             .map_err(|e| plugin_js_error(&ctx, e))?;
         options
@@ -211,7 +214,10 @@ async fn call_plugin(vms: &HashMap<String, PluginVm>, req: CallRequest) -> Resul
             .set("setResult", Function::new(ctx.clone(), || ()))
             .map_err(|e| plugin_js_error(&ctx, e))?;
         options
-            .set("utils", host::build_utils(&ctx).map_err(|e| plugin_js_error(&ctx, e))?)
+            .set(
+                "utils",
+                host::build_utils(&ctx).map_err(|e| plugin_js_error(&ctx, e))?,
+            )
             .map_err(|e| plugin_js_error(&ctx, e))?;
 
         let f: Function = ctx
