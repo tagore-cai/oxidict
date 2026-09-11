@@ -19,7 +19,11 @@ pub fn capture_screen() -> Result<Vec<u8>> {
     encode_png(&image)
 }
 
-/// 截取指定区域（物理像素坐标）。
+/// 截取指定区域。
+///
+/// 坐标语义（跟随 `screenshots` 0.8）：`x`/`y` 是**相对该显示器原点**的物理像素，
+/// crate 内部会加上显示器偏移并在屏幕范围内 clamp；越界或零面积返回错误。
+/// 注意与 [`capture_screen`] 一样，当前只取 `Screen::all()` 的第一块屏。
 pub fn capture_region(x: i32, y: i32, width: u32, height: u32) -> Result<Vec<u8>> {
     let screens = screenshots::Screen::all().map_err(|e| Error::Platform(e.to_string()))?;
     let screen = screens
