@@ -126,6 +126,14 @@ fn main() {
 
     // 0.5 单实例保护：锁文件 + PID 检测（脏锁自动清理）。
     let lock_path = oxidict_core::config::runtime_lock_path();
+    // 锁落在 dirs::runtime_dir()（macOS 上不存在）回退到的 cache_dir，目录不保证
+    // 已存在（干净 HOME、手工清过缓存、首次运行）。缺目录会让 create_new 失败，
+    // 与「已有实例」表现一致而误退出，故先补建。
+    if let Some(parent) = lock_path.parent()
+        && let Err(e) = std::fs::create_dir_all(parent)
+    {
+        log::warn!("创建锁文件目录失败 {}: {e}", parent.display());
+    }
     let lock_created = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -153,7 +161,7 @@ fn main() {
                 {
                     let _ = std::fs::write(&lock_path, std::process::id().to_string());
                 } else {
-                    eprintln!("无法创建锁文件，退出。");
+                    eprintln!("无法创建锁文件 {}，退出。", lock_path.display());
                     std::process::exit(0);
                 }
             } else {
