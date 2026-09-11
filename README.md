@@ -34,6 +34,29 @@ hdiutil create -srcfolder target/release/bundle/macos/Oxidict.app \
   放到 `assets/icon.icns`（可用 `iconutil -c icns` 从 iconset 生成）
 - 未做 codesign / 公证：首次打开需右键 → 打开，绕过 Gatekeeper 提示
 
+## 首次运行授权（macOS）
+
+全局快捷键走 CGEventTap，划词翻译走 Accessibility，两者都需要用户在系统设置里授权：
+
+1. 用 `.app` 运行（不是裸二进制）。裸二进制（`./target/release/oxidict`）没有
+   bundle 身份，TCC 无法把授权稳定记住；建议先 ad-hoc 签名再运行：
+
+   ```bash
+   ./scripts/bundle.sh
+   codesign --force --deep --sign - target/release/bundle/macos/Oxidict.app
+   open target/release/bundle/macos/Oxidict.app
+   ```
+
+2. 首次启动会**主动弹出授权请求**；若没弹，手动到：
+   - **系统设置 → 隐私与安全性 → 输入监控**：勾选 Oxidict（全局快捷键）
+   - **系统设置 → 隐私与安全性 → 辅助功能**：勾选 Oxidict（划词取选中文本）
+
+3. 授权后**重启应用**（TCC 变更对已运行进程不生效）。重新编译会使权限失效，
+   需再次授权。
+
+未授权时应用其它功能可用，仅全局快捷键不可用，日志会输出一次明确提示
+（不再反复刷屏）。
+
 ## 开源协议
 
 [MIT](./LICENSE)。本项目为原 Saladict 的独立 Rust 重写：未复用原版代码，

@@ -59,11 +59,14 @@ struct Registry {
     bindings: Mutex<HashMap<String, Binding>>,
     /// 事件线程是否已启动（Tap 只创建一次，Drop 前常驻）。
     started: AtomicBool,
+    /// 权限不足的完整告警是否已输出过（每次 register 都会重试，避免刷屏）。
+    permission_notice_shown: AtomicBool,
 }
 
 static REGISTRY: Lazy<Registry> = Lazy::new(|| Registry {
     bindings: Mutex::new(HashMap::new()),
     started: AtomicBool::new(false),
+    permission_notice_shown: AtomicBool::new(false),
 });
 
 /// 注册全局快捷键。
@@ -116,12 +119,30 @@ fn start_event_loop() {
             let tap = match Tap::new() {
                 Ok(tap) => tap,
                 Err(e) => {
-                    log::error!(
-                        "全局快捷键监听创建失败: {e}。macOS 需在 系统设置->隐私与安全性->输入监控 \
-                         中授权本应用；Linux 需将用户加入 input 组"
-                    );
-                    // 允许下次 register 重试。
+                    // 允许下次 register 重试（用户授权后改键即可恢复）。
                     REGISTRY.started.store(false, Ordering::SeqCst);
+                    if matches!(e, keytap::Error::PermissionDenied) {
+                        // keytap 只 `IOHIDCheckAccess` 检查、从不请求，未授权时系统
+                        // 弹窗不会出现，用户只能看到日志。这里主动请求一次以弹出
+                        // 授权框，且完整说明只输出一次（启动时会 register 多次）。
+                        if !REGISTRY.permission_notice_shown.swap(true, Ordering::SeqCst) {
+                            let granted = request_input_monitoring();
+                            log::error!(
+                                "全局快捷键不可用: {e}。已请求系统授权{}，请到 \
+                                 系统设置->隐私与安全性->输入监控 勾选本应用后重启（划词翻译还需在\
+                                 「辅助功能」同样授权）；Linux 需将用户加入 input 组；Windows 无需授权",
+                                if granted {
+                                    "（本进程已授权）"
+                                } else {
+                                    "（等待你在弹窗/设置面板中授权）"
+                                }
+                            );
+                        } else {
+                            log::debug!("全局快捷键仍不可用（输入监控权限未授予），跳过重复告警");
+                        }
+                    } else {
+                        log::error!("全局快捷键监听创建失败: {e}");
+                    }
                     return;
                 }
             };
@@ -159,6 +180,31 @@ fn start_event_loop() {
             }
         })
         .expect("failed to spawn hotkey event thread");
+}
+
+/// 主动请求 macOS「输入监控」权限（触发系统授权弹窗）。
+///
+/// keytap 只调 `IOHIDCheckAccess` 做检查，从不调 `IOHIDRequestAccess`，所以
+/// 未授权时「系统设置 → 隐私与安全性 → 输入监控」里既没有本应用、也不会弹窗，
+/// 用户只能看到日志报错。补上这一步，授权入口才会出现。
+///
+/// 返回调用后是否已授权：首次调用通常为 `false`，用户在弹窗/面板授权并**重启**
+/// 应用后才为 `true`。非 macOS 平台恒为 `false`。
+#[cfg(target_os = "macos")]
+fn request_input_monitoring() -> bool {
+    // 与 keytap 相同的声明方式：IOKit framework，kIOHIDRequestTypeListenEvent = 1。
+    #[link(name = "IOKit", kind = "framework")]
+    unsafe extern "C" {
+        fn IOHIDRequestAccess(request: u32) -> bool;
+    }
+    // SAFETY: IOKit 的纯 C 接口，参数为枚举值、无指针与所有权转移，可从任意线程
+    // 调用；返回值即授权状态。唯一副作用是让系统弹出授权请求。
+    unsafe { IOHIDRequestAccess(1) }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn request_input_monitoring() -> bool {
+    false
 }
 
 fn is_modifier(key: Key) -> bool {
