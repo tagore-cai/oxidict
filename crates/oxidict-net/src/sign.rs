@@ -3,7 +3,7 @@
 //! 原实现位于 JS 侧 `crypto-js`，这里用 Rust 密码学库 1:1 平移。
 
 use base64::Engine;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use md5::{Digest, Md5};
 use sha1::Sha1;
 use sha2::Sha256;
@@ -63,9 +63,9 @@ pub fn uuid_v4() -> String {
 
 /// 阿里云风格的随机 nonce：`(100000..199999) * 1000`。
 pub fn alibaba_nonce() -> u64 {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    (rng.gen_range(100_000..200_000u64)) * 1000
+    // rand 0.10 移除了 thread_rng()/gen_range()：改用自由函数 random_range，
+    // 内部仍走线程本地 RNG，无需显式构造。
+    rand::random_range(100_000..200_000u64) * 1000
 }
 
 /// UTC 时间戳，格式 `2024-01-01T12:00:00Z`。

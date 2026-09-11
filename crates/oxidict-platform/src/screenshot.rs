@@ -60,8 +60,10 @@ pub fn capture_interactive() -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn encode_png(image: &screenshots::Image) -> Result<Vec<u8>> {
-    let rgba = image::RgbaImage::from_raw(image.width(), image.height(), image.rgba().clone())
+fn encode_png(image: &screenshots::image::RgbaImage) -> Result<Vec<u8>> {
+    // screenshots 0.8 直接返回其内部 image 0.24 的 RgbaImage，与本工程使用的
+    // image 0.25 不是同一类型（两版本在依赖树中共存），故按原始字节重建。
+    let rgba = image::RgbaImage::from_raw(image.width(), image.height(), image.as_raw().to_vec())
         .ok_or_else(|| Error::Platform("截图数据长度与尺寸不一致".to_string()))?;
     let mut png = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut png);

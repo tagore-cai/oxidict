@@ -22,6 +22,8 @@ pub type MonitorInfo = ((i32, i32), (u32, u32), f32);
 /// 光标所在显示器的信息。光标取不到或显示器枚举失败时返回 `None`。
 pub fn monitor_at_cursor() -> Option<MonitorInfo> {
     let (mx, my) = cursor_position();
-    let d = screenshots::DisplayInfo::from_point(mx, my).ok()?;
+    // 0.8 起 DisplayInfo 不再从 screenshots 根重导出，改用公开的
+    // Screen::from_point 拿到 display_info 字段，避免直接依赖 display_info crate。
+    let d = screenshots::Screen::from_point(mx, my).ok()?.display_info;
     Some(((d.x, d.y), (d.width, d.height), d.scale_factor))
 }
