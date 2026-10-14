@@ -151,13 +151,13 @@ pub async fn chat_completions(
             .trim()
             .to_string();
         // 与原实现一致：去掉模型可能自作主张加的引号。
-        let content = content
-            .strip_prefix('"')
-            .unwrap_or(&content)
-            .strip_suffix('"')
-            .unwrap_or(&content)
-            .to_string();
-        Ok(TranslateResult::Plain(content))
+        // 必须逐层回退到上一步的结果：若写成 `.strip_prefix(..).unwrap_or(&content)`
+        // 再 `.strip_suffix(..).unwrap_or(&content)`，当只有前引号时第二个
+        // `unwrap_or` 会把已经剥掉前缀的中间值丢弃，回退成带引号的原文。
+        let content = content.trim();
+        let content = content.strip_prefix('"').unwrap_or(content);
+        let content = content.strip_suffix('"').unwrap_or(content);
+        Ok(TranslateResult::Plain(content.to_string()))
     }
 }
 

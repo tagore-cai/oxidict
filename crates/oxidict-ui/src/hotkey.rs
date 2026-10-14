@@ -226,7 +226,7 @@ impl HotkeyRecorder {
     pub fn new(state: &Entity<HotkeyRecorderState>) -> Self {
         Self {
             state: state.clone(),
-            placeholder: String::from("点击后按组合键"),
+            placeholder: oxidict_core::i18n::t("config-hotkey-placeholder"),
             style: StyleRefinement::default(),
             size: Size::Medium,
         }

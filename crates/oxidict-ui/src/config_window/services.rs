@@ -5,6 +5,7 @@
 
 use super::pages::{labeled_field, placeholder_text};
 use super::{ConfigWindow, KIND_TABS, nav_kind};
+use crate::tokens::Text;
 use gpui_kit::AppContext as _;
 use gpui_kit::base::{IndexPath, h_flex, v_flex};
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -14,13 +15,45 @@ use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    Context, Entity, IntoElement, ParentElement, SharedString, Styled, Window, div, img, px,
+    Context, Entity, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
+    StatefulInteractiveElement, Styled, Window, div, img, px,
 };
 use oxidict_core::ServiceKind;
 use oxidict_core::config::{config, parse_instance};
 use oxidict_core::i18n::{t, t_args};
 use oxidict_core::schema::ConfigField;
 use oxidict_services::services;
+
+/// 拖拽载荷：携带源列表下标与实例展示名。
+///
+/// 拖拽期间列表不会变化，因此用下标定位足够，无需引入稳定的实例 id 协议。
+#[derive(Clone)]
+struct InstanceDrag {
+    kind: ServiceKind,
+    from: usize,
+    label: SharedString,
+}
+
+/// 跟随指针的拖拽预览（只渲染实例名，避免拖拽时重建整行）。
+struct InstanceDragPreview {
+    label: SharedString,
+}
+
+impl Render for InstanceDragPreview {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        div()
+            .px_2()
+            .py_1()
+            .rounded_sm()
+            .border_1()
+            .border_color(theme.colors.border)
+            .bg(theme.colors.background)
+            .text_size(Text::Body.size())
+            .text_color(theme.colors.foreground)
+            .child(self.label.clone())
+    }
+}
 
 /// 下拉字段：`(配置键, 选择状态实体, 可选项的值列表)`。
 type SelectField = (
@@ -157,6 +190,10 @@ impl ConfigWindow {
         let mut list = store.service_list(list_key);
         list.retain(|k| k != key);
         let _ = store.set_service_list(list_key, &list);
+        // 同步删除该实例的配置对象。只从列表移除会留下孤儿密钥：重新添加同名
+        // 服务时会复用旧配置（在界面上表现为「刚删掉的 API Key 又出现了」），
+        // 且已失效的密钥长期驻留在 config.json 里。
+        let _ = store.remove(key);
     }
 
     /// 上移 / 下移服务实例（`delta` 为 -1 或 +1）。
@@ -169,6 +206,40 @@ impl ConfigWindow {
             return;
         }
         list.swap(index, target as usize);
+        let _ = store.set_service_list(list_key, &list);
+    }
+
+    /// 拖拽重排：把 `from` 处的实例移到 `to` 处。
+    ///
+    /// 语义是「取出后插入到 `to`」（即拖到某一行上就落在那一行的位置），
+    /// 不是交换——与用户的拖动直觉一致。`from == to` 视为无操作。
+    fn move_instance_to(&mut self, kind: ServiceKind, from: usize, to: usize) {
+        if from == to {
+            return;
+        }
+        let store = config();
+        let list_key = kind.list_key();
+        let mut list = store.service_list(list_key);
+        if from >= list.len() || to >= list.len() {
+            return;
+        }
+        let item = list.remove(from);
+        list.insert(to, item);
+        let _ = store.set_service_list(list_key, &list);
+    }
+
+    /// 把实例移到列表末尾（拖到列表空白处的兜底落点）。
+    ///
+    /// 没有它，想把一项拖到最后必须精确落在最后一行上。
+    fn move_instance_to_end(&mut self, kind: ServiceKind, from: usize) {
+        let store = config();
+        let list_key = kind.list_key();
+        let mut list = store.service_list(list_key);
+        if from >= list.len() {
+            return;
+        }
+        let item = list.remove(from);
+        list.push(item);
         let _ = store.set_service_list(list_key, &list);
     }
 
@@ -276,9 +347,16 @@ fn enabled_prefixes(kind: ServiceKind) -> Vec<String> {
 
 /// 注册表里该分类的全部服务 id。
 ///
-/// 服务 id 是注册表里的静态字符串，直接泄漏成 'static（每次刷新最多几十个，
-/// 量级有界），换取能直接喂给 `SelectState<Vec<&'static str>>`。
+/// `SelectState<Vec<&'static str>>` 要求元素是 `'static`，而注册表返回的是
+/// 普通 `String`；这里把 id 驻留（intern）成 `'static`。关键是**按值去重**：
+/// 早期实现每次刷新都 `Box::leak` 全部 id，而刷新会在每次切页/增删实例时触发，
+/// 泄漏随操作次数线性增长。现在每个不同的 id 只泄漏一次，总量被服务数量封顶。
 fn all_service_ids(kind: ServiceKind) -> Vec<&'static str> {
+    use std::collections::HashSet;
+    use std::sync::{Mutex, OnceLock};
+
+    static INTERNED: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
+
     let ids: Vec<String> = match kind {
         ServiceKind::Translate => services()
             .translators()
@@ -301,8 +379,19 @@ fn all_service_ids(kind: ServiceKind) -> Vec<&'static str> {
             .map(|t| t.id().to_string())
             .collect(),
     };
+
+    let interned = INTERNED.get_or_init(|| Mutex::new(HashSet::new()));
+    // 锁中毒只可能来自本函数自身 panic，此时回退到内部数据即可继续。
+    let mut interned = interned.lock().unwrap_or_else(|e| e.into_inner());
     ids.into_iter()
-        .map(|id| Box::leak(id.into_boxed_str()) as &'static str)
+        .map(|id| match interned.get(id.as_str()).copied() {
+            Some(existing) => existing,
+            None => {
+                let leaked: &'static str = Box::leak(id.into_boxed_str());
+                interned.insert(leaked);
+                leaked
+            }
+        })
         .collect()
 }
 
@@ -328,7 +417,7 @@ fn field_label(schema: &[ConfigField], key: &str) -> String {
 
 fn field_label_div(label: &str, color: gpui_kit::Hsla) -> gpui_kit::AnyElement {
     div()
-        .text_size(px(12.))
+        .text_size(Text::Body.size())
         .text_color(color)
         .child(SharedString::from(label.to_string()))
         .into_any_element()
@@ -352,7 +441,7 @@ impl ConfigWindow {
 
         page = page.child(
             div()
-                .text_size(px(12.))
+                .text_size(Text::Body.size())
                 .text_color(muted_fg)
                 .child(SharedString::from(t_args(
                     "config-instances-count",
@@ -363,8 +452,40 @@ impl ConfigWindow {
                 ))),
         );
 
+        // 拖拽重排共用一个 WeakEntity：`on_drop` 的回调签名没有 `&mut Self`，
+        // 只能经弱引用回写（与 pages.rs 主题开关同一套路）。
+        let weak = cx.entity().downgrade();
+
         if list.is_empty() {
             page = page.child(placeholder_text(t("config-no-instances").as_str()));
+        }
+        // 列表末尾的兜底放置区：拖到这里 = 移到最后。
+        if list.len() > 1 {
+            page = page.child(
+                h_flex()
+                    .id("instance-drop-tail")
+                    .w_full()
+                    .py_2()
+                    .justify_center()
+                    .on_drop::<InstanceDrag>({
+                        let weak = weak.clone();
+                        move |drag, _window, cx| {
+                            let Some(this) = weak.upgrade() else {
+                                return;
+                            };
+                            this.update(cx, |this, cx| {
+                                this.move_instance_to_end(drag.kind, drag.from);
+                                cx.notify();
+                            });
+                        }
+                    })
+                    .child(
+                        div()
+                            .text_size(Text::Body.size())
+                            .text_color(muted_fg)
+                            .child(SharedString::from(t("config-move-to-end"))),
+                    ),
+            );
         }
         for (list_ix, key) in list.iter().enumerate() {
             let key = key.clone();
@@ -372,12 +493,39 @@ impl ConfigWindow {
             let (sid, _) = parse_instance(&key);
             page = page.child(
                 h_flex()
+                    .id(("instance-row", list_ix))
                     .w_full()
                     .justify_between()
                     .items_center()
                     .py_2()
                     .border_b_1()
                     .border_color(border)
+                    // 拖拽源 + 放置目标：拖到某一行上，实例就落到那一行的位置。
+                    // ↑/↓ 按钮保留，作为精确调整与无鼠标滚轮场景的兜底。
+                    .on_drag(
+                        InstanceDrag {
+                            kind,
+                            from: list_ix,
+                            label: SharedString::from(name.clone()),
+                        },
+                        |drag: &InstanceDrag, _offset, _window, cx| {
+                            cx.new(|_| InstanceDragPreview {
+                                label: drag.label.clone(),
+                            })
+                        },
+                    )
+                    .on_drop::<InstanceDrag>({
+                        let weak = weak.clone();
+                        move |drag, _window, cx| {
+                            let Some(this) = weak.upgrade() else {
+                                return;
+                            };
+                            this.update(cx, |this, cx| {
+                                this.move_instance_to(drag.kind, drag.from, list_ix);
+                                cx.notify();
+                            });
+                        }
+                    })
                     .child(
                         h_flex()
                             .gap_2()
@@ -389,13 +537,13 @@ impl ConfigWindow {
                             })
                             .child(
                                 div()
-                                    .text_size(px(13.))
+                                    .text_size(Text::Label.size())
                                     .text_color(fg)
                                     .child(SharedString::from(name)),
                             )
                             .child(
                                 div()
-                                    .text_size(px(11.))
+                                    .text_size(Text::Sm.size())
                                     .text_color(muted_fg)
                                     .child(SharedString::from(sid.to_string())),
                             ),
@@ -489,7 +637,7 @@ impl ConfigWindow {
                 .gap_3()
                 .child(
                     div()
-                        .text_size(px(13.))
+                        .text_size(Text::Label.size())
                         .text_color(fg)
                         .font_weight(gpui_kit::FontWeight::MEDIUM)
                         .child(SharedString::from(t_args(
@@ -545,7 +693,7 @@ impl ConfigWindow {
                         ))
                         .child(
                             div()
-                                .text_size(px(13.))
+                                .text_size(Text::Label.size())
                                 .text_color(fg)
                                 .child(SharedString::from(label)),
                         ),
@@ -559,7 +707,7 @@ impl ConfigWindow {
             if let Some(err) = &form.error {
                 form_card = form_card.child(
                     div()
-                        .text_size(px(12.))
+                        .text_size(Text::Body.size())
                         .text_color(cx.theme().colors.danger)
                         .child(SharedString::from(err.clone())),
                 );

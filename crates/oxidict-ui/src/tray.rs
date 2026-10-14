@@ -235,17 +235,22 @@ pub fn install(sender: UnboundedSender<TrayCommand>) -> anyhow::Result<()> {
             anyhow::anyhow!(t_args("tray-error-menu-build", &[("err", &e.to_string())]))
         })?;
 
-    let tray = TrayIconBuilder::new()
+    let mut builder = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         // 左键不弹菜单：左键点击走 tray_click_event 分发（对齐原版
         // on_tray_click），菜单只留给右键。
         .with_menu_on_left_click(false)
         .with_tooltip(t("app-name"))
-        .with_icon(icon)
-        .build()
-        .map_err(|e| {
-            anyhow::anyhow!(t_args("tray-error-icon-build", &[("err", &e.to_string())]))
-        })?;
+        .with_icon(icon);
+    // macOS：声明为模板图标，由系统按菜单栏浅/深色自动反色，避免深浅切换时
+    // 图标糊在背景里。其它平台没有该概念，故 cfg 收口。
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.with_icon_as_template(true);
+    }
+    let tray = builder.build().map_err(|e| {
+        anyhow::anyhow!(t_args("tray-error-icon-build", &[("err", &e.to_string())]))
+    })?;
     // 图标常驻进程生命周期，drop 会导致托盘消失。
     let _tray: &'static TrayIcon = Box::leak(Box::new(tray));
 
@@ -389,14 +394,23 @@ pub fn set_auto_copy_checked(mode: AutoCopyMode) {
     }
 }
 
-/// 纯色占位图标（工程暂无自带图标资源，画一个沙拉绿方块）。
+/// 菜单栏图标。
+///
+/// 资源由 `scripts/gen_icons.py` 生成：44×44 的**裸 RGBA**（纯黑 + alpha），
+/// 直接 `include_bytes!` 喂给 `Icon::from_rgba`，UI 层因此不需要图像解码依赖。
+/// macOS 上配合 `with_icon_as_template(true)` 交给系统按菜单栏深浅自动着色。
+///
+/// 早期实现是「现画一个纯色绿方块」的占位——在菜单栏里既不像图标，也不表达
+/// 任何语义。
 fn build_icon() -> anyhow::Result<Icon> {
-    const SIZE: u32 = 32;
-    let mut rgba = Vec::with_capacity((SIZE * SIZE * 4) as usize);
-    // #2EC27E
-    for _ in 0..(SIZE * SIZE) {
-        rgba.extend_from_slice(&[0x2E, 0xC2, 0x7E, 0xFF]);
+    const SIZE: u32 = 44;
+    const RGBA: &[u8] = include_bytes!("../../../assets/icon-tray-44.rgba");
+    if RGBA.len() != (SIZE * SIZE * 4) as usize {
+        return Err(anyhow::anyhow!(t_args(
+            "tray-error-icon-gen",
+            &[("err", "托盘图标数据与尺寸不符，请重跑 scripts/gen_icons.py")]
+        )));
     }
-    Icon::from_rgba(rgba, SIZE, SIZE)
+    Icon::from_rgba(RGBA.to_vec(), SIZE, SIZE)
         .map_err(|e| anyhow::anyhow!(t_args("tray-error-icon-gen", &[("err", &e.to_string())])))
 }

@@ -4,16 +4,13 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Oxidict 本机外部调用接口：127.0.0.1:60606，路由与原 Saladict 一致"
 
 [dependencies]
 oxidict-core.workspace = true
 tiny_http.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-thiserror.workspace = true
 anyhow.workspace = true
 log.workspace = true
-tokio.workspace = true
 
 [lints]
 workspace = true

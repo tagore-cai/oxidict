@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Oxidict 服务层：Translator/Recognizer/Tts/Collector trait 与注册表，内置 50 个翻译/OCR/TTS/生词本服务"
 
 [dependencies]
 parking_lot.workspace = true
@@ -12,11 +13,10 @@ oxidict-core.workspace = true
 oxidict-net.workspace = true
 oxidict-platform.workspace = true
 async-trait.workspace = true
-reqwest.workspace = true
+wreq.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-thiserror.workspace = true
-anyhow.workspace = true
+scraper.workspace = true
 hmac.workspace = true
 sha1.workspace = true
 sha2.workspace = true

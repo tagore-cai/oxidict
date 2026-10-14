@@ -6,10 +6,11 @@
 //! 的 FFI 绑定，容易引入不可控的编译风险，因此这里采用「写临时 PNG + 调用外部 OCR 助手」
 //! 的命令回退方案：
 //!
-//! 1. 把图像字节写入缓存目录的临时文件 `oxidict_ocr_tmp.png`；
+//! 1. 把图像字节写入缓存目录的临时文件（文件名含 PID 与单调序号，见下）；
 //! 2. 调用由环境变量 `OXIDICT_OCR_BIN` 指定（默认 `/usr/local/bin/oxidict-ocr`）的 OCR
 //!    助手，参数为 `<png 路径> <语言码>`；
-//! 3. 助手输出即识别文本，否则返回 [`oxidict_core::Error::Platform`]。
+//! 3. 助手输出即识别文本，否则返回 [`oxidict_core::Error::Platform`]；
+//! 4. 无论成功失败都删除临时文件。
 //!
 //! ## 升级为原生 Vision 的切入点
 //!
@@ -23,11 +24,18 @@
 
 use oxidict_core::{Language, Result};
 use std::io::Write;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// 临时文件序号。固定文件名会让两次并发 OCR 互相覆盖同一路径，
+/// 先写入的图片被后一次替换，识别结果串台；这里用 PID + 自增序号保证唯一。
+static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
 
 pub fn system_ocr(image: &[u8], lang: Language) -> Result<String> {
     fn inner(image: &[u8], lang: Language) -> anyhow::Result<String> {
         let dir = dirs::cache_dir().ok_or_else(|| anyhow::anyhow!("no cache dir"))?;
-        let tmp = dir.join("oxidict_ocr_tmp.png");
+        std::fs::create_dir_all(&dir)?;
+        let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+        let tmp = dir.join(format!("oxidict_ocr_{}_{seq}.png", std::process::id()));
         {
             let mut f =
                 std::fs::File::create(&tmp).map_err(|e| anyhow::anyhow!("create tmp: {e}"))?;
@@ -41,6 +49,9 @@ pub fn system_ocr(image: &[u8], lang: Language) -> Result<String> {
             .arg(tmp.to_string_lossy().as_ref())
             .arg(lang.code())
             .output();
+
+        // 临时文件不再需要，成功失败都清理，避免缓存目录无限堆积。
+        let _ = std::fs::remove_file(&tmp);
 
         match output {
             Ok(o) if o.status.success() => {

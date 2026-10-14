@@ -11,17 +11,18 @@
 //! | [`selection::selected_text`] 选中文本 | `selection` crate（内部走 AX） | 剪切板模拟（`selection` crate） | 剪切板模拟（`selection` crate） |
 //! | [`screenshot::capture_screen`] / `capture_region` 截图 | `screenshots` crate 封装原生 API | 同上 | 同上 |
 //! | [`ocr::system_ocr`] 系统 OCR | **命令回退**（见 `ocr/macos.rs` 注释） | `windows` crate → `Windows.Media.Ocr` | `tesseract` 命令行 |
-//! | [`hotkey::register`] 全局快捷键 | `global-hotkey`（RegisterEventHotKey 注册制） | 同左 | 同左 |
+//! | [`hotkey::register`] 全局快捷键 | `keytap`（CGEventTap，观察流制） | `keytap`（`WH_KEYBOARD_LL`） | `keytap`（evdev） |
 //! | [`mouse::cursor_position`] 光标位置 | `mouse_position` crate | 同左 | 同左 |
 //! | [`clipboard::start_monitor`] 剪切板监听 | `arboard` 轮询去抖 | `arboard` 轮询去抖 | `arboard` 轮询去抖 |
 //! | [`detect::detect`] 语言检测 | `lingua` 离线检测 | `lingua` 离线检测 | `lingua` 离线检测 |
 //!
-//! ## 为什么不用 rdev
+//! ## 为什么不用 rdev / global-hotkey
 //!
 //! rdev 的全局键盘 tap 回调会在自己的线程调 HIToolbox 查键盘布局，而这些 API
 //! 断言必须在主队列执行——新版 macOS 上一敲键即 `dispatch_assert_queue_fail`
-//! 崩溃（有 .ips 报告佐证）。全局快捷键因此改用注册制的 `global-hotkey`，
-//! 鼠标释放钩子随 rdev 一并撤除。详见 `hotkey.rs` 顶部注释。
+//! 崩溃（有 .ips 报告佐证）。`global-hotkey` 的 macOS/Windows 后端没问题，但其
+//! Linux 后端只有 `x11-dl`，Wayland 会话下快捷键完全失效。两者因此都撤除，
+//! 统一改用 `keytap`（三平台后端齐备，OS 线程零用户代码）。详见 `hotkey.rs` 顶部注释。
 //!
 //! ## 关于 macOS OCR 的实现选择
 //!

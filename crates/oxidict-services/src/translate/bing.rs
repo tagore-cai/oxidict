@@ -10,7 +10,7 @@ use oxidict_core::map_language;
 use oxidict_core::schema::ConfigField;
 use oxidict_core::{Error, Language, Result, TranslateRequest, TranslateResult};
 use oxidict_net::NetErr as _;
-use oxidict_net::{check, post_with_headers};
+use oxidict_net::check;
 use serde_json::Value;
 
 pub struct Bing;
@@ -29,7 +29,7 @@ impl Translator for Bing {
 
     fn config_schema(&self) -> Vec<ConfigField> {
         // 无需任何配置。
-        vec![]
+        vec![crate::tls_field()]
     }
 
     fn map_language(&self, lang: Language) -> String {
@@ -75,7 +75,8 @@ impl Translator for Bing {
         let to = self.map_language(req.to);
         let url = format!("{}to={}", MS_TRANSLATE_URL, to);
 
-        let resp = post_with_headers(
+        let resp = oxidict_net::post_with_headers_for(
+            req.tls,
             url,
             &[
                 ("Content-Type", "application/json"),

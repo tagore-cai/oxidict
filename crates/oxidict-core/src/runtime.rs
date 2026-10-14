@@ -1,6 +1,6 @@
 //! 全局 tokio 运行时。
 //!
-//! 服务层全部是 tokio 生态（reqwest 的 IO 依赖 tokio 反应器），而 GPUI 自带
+//! 服务层全部是 tokio 生态（HTTP 客户端的 IO 依赖 tokio 反应器），而 GPUI 自带
 //! 独立执行器、不注入 tokio 上下文。所以这里持有一个进程级 runtime：
 //! UI 侧用 [`handle`] 拿句柄，`handle.spawn(...)` 后在 GPUI 的 future 里
 //! await `JoinHandle`——JoinHandle 本身不依赖 tokio 线程局部，可以跨执行器等待。

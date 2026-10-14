@@ -133,7 +133,7 @@ impl Eudic {
     }
 }
 
-/// reqwest 错误转 `Error::Network`，对齐 `oxidict-net` 的内部约定。
-fn net_err(e: reqwest::Error) -> Error {
+/// HTTP 客户端错误转 `Error::Network`，对齐 `oxidict-net` 的内部约定。
+fn net_err(e: wreq::Error) -> Error {
     Error::Network(e.to_string())
 }

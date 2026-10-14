@@ -23,13 +23,16 @@ impl Translator for Google {
     }
 
     fn config_schema(&self) -> Vec<ConfigField> {
-        vec![ConfigField::Text {
-            key: "custom_url",
-            label: "自定义地址",
-            placeholder: DEFAULT_URL,
-            secret: false,
-            required: false,
-        }]
+        vec![
+            ConfigField::Text {
+                key: "custom_url",
+                label: "自定义地址",
+                placeholder: DEFAULT_URL,
+                secret: false,
+                required: false,
+            },
+            crate::tls_field(),
+        ]
     }
 
     fn map_language(&self, lang: Language) -> String {
@@ -68,7 +71,7 @@ impl Translator for Google {
             q = urlencoding::encode(&req.text),
         );
 
-        let result: Value = oxidict_net::get_value(url).await?;
+        let result: Value = oxidict_net::get_value_for(req.tls, url).await?;
 
         // result[1] 存在即为词典模式。
         if result.get(1).map(|v| !v.is_null()).unwrap_or(false) {

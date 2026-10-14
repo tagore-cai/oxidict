@@ -47,7 +47,10 @@ pub fn capture_interactive() -> Result<Vec<u8>> {
         .ok_or_else(|| Error::Platform("无法定位缓存目录".to_string()))?
         .join(oxidict_core::config::APP_ID);
     std::fs::create_dir_all(&dir)?;
-    let path = dir.join("screenshot_cut.png");
+    // 文件名带 PID + 序号：固定名 `screenshot_cut.png` 在两次框选重叠时会被
+    // 互相覆盖，读到对方半张图。
+    let seq = TMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let path = dir.join(format!("screenshot_cut_{}_{seq}.png", std::process::id()));
     let _ = std::fs::remove_file(&path);
 
     let status = std::process::Command::new("screencapture")
@@ -56,13 +59,17 @@ pub fn capture_interactive() -> Result<Vec<u8>> {
         .status()
         .map_err(|e| Error::Platform(format!("调用 screencapture 失败: {e}")))?;
     if !status.success() || !path.exists() {
-        // 用户按 Esc 取消属于正常路径，返回空结果而不是错误。
+        // 用户按 Esc 取消属于正常路径：调用方按 `Error::Platform` 归类为「已取消」。
+        let _ = std::fs::remove_file(&path);
         return Err(Error::Platform("截图已取消".to_string()));
     }
     let bytes = std::fs::read(&path)?;
     let _ = std::fs::remove_file(&path);
     Ok(bytes)
 }
+
+/// 交互框选临时文件序号（配合 PID 保证唯一）。
+static TMP_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 fn encode_png(image: &screenshots::image::RgbaImage) -> Result<Vec<u8>> {
     // screenshots 0.8 直接返回其内部 image 0.24 的 RgbaImage，与本工程使用的

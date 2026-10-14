@@ -57,6 +57,14 @@ pub fn md5_hex(s: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
+/// 当前 Unix 时间戳（秒）。
+///
+/// 部分签名协议需要它（如有道 v3 的 `curtime`）。故意不做成"可注入时钟"：
+/// 需要确定性的测试应该直接测签名明文模板，而不是把时钟抽象化。
+pub fn unix_seconds() -> i64 {
+    chrono::Utc::now().timestamp()
+}
+
 pub fn uuid_v4() -> String {
     uuid::Uuid::new_v4().to_string()
 }
@@ -113,12 +121,17 @@ pub fn alibaba_escape(s: &str) -> String {
         .replace("%2C", "%252C")
 }
 
-/// 火山引擎 / 字节系使用的 HMAC-SHA256 签名：`HMAC(HMAC(kDate, region), kService)` 派生密钥。
+/// AWS SigV4 的派生密钥：`kSigning = HMAC(HMAC(HMAC(HMAC("AWS4"+secret, date), region), service), "aws4_request")`。
+///
+/// 首环必须是 `"AWS4" + secret` 作为密钥、`date` 作为消息。早期实现写成
+/// `HMAC(secret + date, date)`，既不是 AWS（缺 `AWS4` 前缀），也不是火山引擎
+/// （首环应为 `HMAC(secret, date)`，见 `oxidict-services` 的 volcengine 实现），
+/// 任何按此签名的请求都会被服务端判为签名不匹配。
 pub fn derive_aws_key(secret: &str, date: &str, region: &str, service: &str) -> Vec<u8> {
-    let k_date = hmac_sha256_raw(format!("{}{}", secret, date).as_bytes(), date.as_bytes());
+    let k_date = hmac_sha256_raw(format!("AWS4{}", secret).as_bytes(), date.as_bytes());
     let k_region = hmac_sha256_raw(&k_date, region.as_bytes());
     let k_service = hmac_sha256_raw(&k_region, service.as_bytes());
-    hmac_sha256_raw(&k_service, b"request")
+    hmac_sha256_raw(&k_service, b"aws4_request")
 }
 
 pub fn hmac_sha256_raw(key: &[u8], msg: &[u8]) -> Vec<u8> {
@@ -127,7 +140,11 @@ pub fn hmac_sha256_raw(key: &[u8], msg: &[u8]) -> Vec<u8> {
     mac.finalize().into_bytes().to_vec()
 }
 
-/// 火山引擎 OCR 的完整签名流程，返回 `Authorization` 头所需的五个分量。
+/// AWS SigV4 完整签名流程，返回 `Authorization` 头所需的各分量。
+///
+/// 注意与火山引擎的区别：火山系（`oxidict-services` 的 volcengine 翻译/OCR）
+/// 用的是同族但**不等价**的变体（首环无 `AWS4` 前缀、尾缀为 `request`），
+/// 因此它们各自就地实现，不复用本函数。
 pub struct AwsSignature {
     pub credential: String,
     pub signed_headers: String,
@@ -153,14 +170,24 @@ pub fn aws_sign(
     let x_date = aws_now();
     let short_date = aws_date();
 
+    // SigV4 要求 `host` 必须参与签名。早期实现把 host 参数整个丢弃
+    // （`let _ = host;`），只在调用方恰好自带 host 头时才算对；这里在缺失时
+    // 自动补上，保证签名集合始终包含 host。
     let mut signed: Vec<(&str, &str)> = headers.to_vec();
+    if !signed.iter().any(|(k, _)| k.eq_ignore_ascii_case("host")) {
+        signed.push(("host", host));
+    }
     signed.push(("x-date", x_date.as_str()));
-    signed.sort_by(|a, b| a.0.cmp(b.0));
-    let signed_headers = signed.iter().map(|(k, _)| *k).collect::<Vec<_>>().join(";");
+    signed.sort_by_key(|(k, _)| k.to_ascii_lowercase());
+    let signed_headers = signed
+        .iter()
+        .map(|(k, _)| k.to_ascii_lowercase())
+        .collect::<Vec<_>>()
+        .join(";");
 
     let canonical_headers = signed
         .iter()
-        .map(|(k, v)| format!("{}:{}\n", k, v.trim()))
+        .map(|(k, v)| format!("{}:{}\n", k.to_ascii_lowercase(), v.trim()))
         .collect::<String>();
 
     let payload_hash = sha256_hex(payload);
@@ -170,9 +197,11 @@ pub fn aws_sign(
         method, path, query, canonical_headers, signed_headers, payload_hash
     );
 
-    let scope = format!("{}/{}/{}/request", short_date, region, service);
+    // 凭证范围尾缀固定为 `aws4_request`，算法标识固定为 `AWS4-HMAC-SHA256`；
+    // 写成 `request` / `HMAC-SHA256` 会让服务端判为签名不匹配。
+    let scope = format!("{}/{}/{}/aws4_request", short_date, region, service);
     let string_to_sign = format!(
-        "HMAC-SHA256\n{}\n{}\n{}",
+        "AWS4-HMAC-SHA256\n{}\n{}\n{}",
         x_date,
         scope,
         sha256_hex(canonical_request.as_bytes())
@@ -180,7 +209,6 @@ pub fn aws_sign(
 
     let signing_key = derive_aws_key(secret_key, &short_date, region, service);
     let signature = hex::encode(hmac_sha256_raw(&signing_key, string_to_sign.as_bytes()));
-    let _ = host;
 
     AwsSignature {
         credential: format!("{}/{}", access_key, scope),
@@ -241,6 +269,14 @@ mod tests {
         assert_eq!(alibaba_escape("a+b"), "a%252Bb");
     }
 
+    /// 时间戳只校验量级，不钉死具体值——那是时钟读数，钉死必然脆弱。
+    #[test]
+    fn unix_seconds_is_a_plausible_epoch() {
+        let now = unix_seconds();
+        assert!(now > 1_600_000_000, "过小，可能不是秒: {now}");
+        assert!(now < 4_102_444_800, "过大，可能不是秒: {now}");
+    }
+
     #[test]
     fn md5_matches_known_vector() {
         assert_eq!(md5_hex("hello"), "5d41402abc4b2a76b9719d911017c592");
@@ -277,6 +313,50 @@ mod tests {
         assert_eq!(sig.signature.len(), 64);
         assert!(sig.signed_headers.starts_with("content-type;"));
         assert!(sig.credential.starts_with("ak/"));
+        // 凭证范围尾缀与算法标识必须符合 SigV4 规范。
+        assert!(sig.credential.ends_with("/aws4_request"));
+    }
+
+    /// AWS SigV4 官方测试向量（《Examples of the complete Version 4 signing
+    /// process》）：派生密钥必须与文档给出的值逐字节一致。
+    ///
+    /// 该向量能同时锁住首环的 `"AWS4"` 前缀与尾环的 `"aws4_request"`——早期
+    /// 实现写成 `HMAC(secret + date, date)` 并配 `b"request"`，本条会失败。
+    #[test]
+    fn derive_aws_key_matches_aws_documented_vector() {
+        let key = derive_aws_key(
+            "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+            "20150830",
+            "us-east-1",
+            "iam",
+        );
+        assert_eq!(
+            hex::encode(key),
+            "c4afb1cc5771d871763a393e44b703571b55cc28424d1a5e86da6ed3c154a4b9"
+        );
+    }
+
+    /// host 未由调用方显式提供时，必须自动加入签名集合。
+    #[test]
+    fn aws_sign_always_covers_host() {
+        let sig = aws_sign(
+            "GET",
+            "example.amazonaws.com",
+            "/",
+            "",
+            &[],
+            b"",
+            "ak",
+            "sk",
+            "us-east-1",
+            "service",
+        );
+        assert!(
+            sig.signed_headers.split(';').any(|h| h == "host"),
+            "signed_headers={}",
+            sig.signed_headers
+        );
+        assert!(sig.signed_headers.ends_with("host;x-date"));
     }
 
     #[test]

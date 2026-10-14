@@ -24,6 +24,43 @@ use std::sync::Arc;
 /// 实例名在配置对象里的键，与原 `INSTANCE_NAME_CONFIG_KEY` 对齐。
 pub const INSTANCE_NAME_KEY: &str = "instance_name";
 
+/// HTTP 指纹档位在实例配置里的键（取值见 [`oxidict_core::TlsProfile`]）。
+///
+/// 属于实例级配置而非全局键：同一服务的两个实例完全可以一个走官方 API、
+/// 另一个指向会被 WAF 按指纹拦的网页端点。
+pub const TLS_KEY: &str = "tls";
+
+/// 从实例配置读指纹档位；缺省或不认识的值都是「不模拟」。
+fn tls_of(cfg: &oxidict_core::ServiceConfig) -> oxidict_core::TlsProfile {
+    cfg.get(TLS_KEY)
+        .and_then(|v| v.as_str())
+        .map(oxidict_core::TlsProfile::from_code)
+        .unwrap_or_default()
+}
+
+/// 指纹档位的表单选项，网页端点型服务共用。
+///
+/// 做成下拉而非自由文本：档位名必须精确匹配（见 `TlsProfile::from_code`），
+/// 写错会**静默**回退成「不模拟」，用户会以为设置没生效却找不到原因。
+pub const TLS_OPTIONS: &[(&str, &str)] = &[
+    ("native", "不模拟浏览器（默认，调官方 API 用）"),
+    ("chrome", "模拟 Chrome（被 WAF 拦截时用）"),
+    ("safari", "模拟 Safari"),
+];
+
+/// 生成 `tls` 配置字段，附在**会被 WAF 按指纹拦**的网页端点服务 schema 末尾。
+///
+/// 官方 API（带 Key 鉴权）不需要它——那边按指纹拦的概率极低，白白多付一次
+/// 浏览器握手代价。
+pub fn tls_field() -> oxidict_core::schema::ConfigField {
+    oxidict_core::schema::ConfigField::Select {
+        key: TLS_KEY,
+        label: "HTTP 指纹",
+        options: TLS_OPTIONS,
+        default: "native",
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Traits
 // ---------------------------------------------------------------------------
@@ -132,6 +169,14 @@ impl Services {
         self.translators.write().insert(t.id().to_string(), t);
     }
 
+    /// 摘掉一个翻译服务。返回是否真的存在过。
+    ///
+    /// 供配置驱动的自定义服务「改配置后立即生效」使用——没有它，用户删掉或改名
+    /// 一条自定义服务后，旧实现会一直留在注册表里直到重启。
+    pub fn remove_translator(&self, id: &str) -> bool {
+        self.translators.write().remove(id).is_some()
+    }
+
     pub fn register_recognizer(&self, r: Arc<dyn Recognizer>) {
         self.recognizers.write().insert(r.id().to_string(), r);
     }
@@ -228,6 +273,13 @@ pub fn init_builtin_services() {
     recognize::register(services());
     tts::register(services());
     collection::register(services());
+    // 配置驱动的自定义服务放在**内置之后**注册：这样「与内置同名」能被检出并跳过，
+    // 而不是让一条自定义 spec 悄悄顶掉内置实现。
+    match oxidict_core::config::store_opt() {
+        Some(store) => translate::custom::reload(services(), &store),
+        // 配置尚未初始化时跳过即可：自定义服务是增量能力，不该拦住启动。
+        None => log::warn!("配置未初始化，跳过自定义服务注册"),
+    }
 }
 
 /// 一个实例在设置面板里的展示名：优先读 `instance_name`，否则用服务 id。
@@ -254,7 +306,8 @@ pub async fn translate_instance(
 ) -> oxidict_core::Result<oxidict_core::TranslateResult> {
     let store = oxidict_core::config::config();
     let (svc, cfg) = services().resolve_translator(instance, &store)?;
-    svc.translate(req.with_config(cfg)).await
+    let tls = tls_of(&cfg);
+    svc.translate(req.with_config(cfg).with_tls(tls)).await
 }
 
 /// 按实例 key 执行识别。与 [`translate_instance`] 同构。
@@ -264,8 +317,13 @@ pub async fn recognize_instance(
 ) -> oxidict_core::Result<String> {
     let store = oxidict_core::config::config();
     let (svc, cfg) = services().resolve_recognizer(instance, &store)?;
-    svc.recognize(oxidict_core::RecognizeRequest { config: cfg, ..req })
-        .await
+    let tls = tls_of(&cfg);
+    svc.recognize(oxidict_core::RecognizeRequest {
+        config: cfg,
+        tls,
+        ..req
+    })
+    .await
 }
 
 /// 按实例 key 执行语音合成。与 [`translate_instance`] 同构。
@@ -275,8 +333,13 @@ pub async fn tts_instance(
 ) -> oxidict_core::Result<Vec<u8>> {
     let store = oxidict_core::config::config();
     let (svc, cfg) = services().resolve_tts(instance, &store)?;
-    svc.tts(oxidict_core::TtsRequest { config: cfg, ..req })
-        .await
+    let tls = tls_of(&cfg);
+    svc.tts(oxidict_core::TtsRequest {
+        config: cfg,
+        tls,
+        ..req
+    })
+    .await
 }
 
 /// 取「翻译服务启用列表」的首个实例并执行翻译。

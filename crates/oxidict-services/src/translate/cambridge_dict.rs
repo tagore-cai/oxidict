@@ -152,7 +152,7 @@ impl Translator for CambridgeDict {
     }
 
     fn config_schema(&self) -> Vec<ConfigField> {
-        vec![]
+        vec![crate::tls_field()]
     }
 
     fn map_language(&self, lang: Language) -> String {
@@ -197,7 +197,7 @@ impl Translator for CambridgeDict {
             urlencoding::encode(text)
         );
 
-        let html = oxidict_net::get_text(url).await?;
+        let html = oxidict_net::get_text_for(req.tls, url).await?;
 
         let entries = elements_inner(&html, "entry-body__el");
         if entries.is_empty() {
@@ -217,7 +217,7 @@ impl Translator for CambridgeDict {
                     None
                 };
                 let voice = match voice {
-                    Some(url) => oxidict_net::get_bytes(&url)
+                    Some(url) => oxidict_net::get_bytes_for(req.tls, &url)
                         .await
                         .ok()
                         .map(|b| Arc::new(b.to_vec())),

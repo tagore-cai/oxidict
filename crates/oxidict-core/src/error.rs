@@ -1,3 +1,18 @@
+//! 统一错误类型。
+//!
+//! 全项目只有这一个错误枚举：服务层、平台层、插件层的错误都归并到这里，
+//! 因此 `?` 可以跨层传递而不需要每层各写一个 From 转换。
+//!
+//! 分层约定：
+//! - 库代码返回**有语义、可匹配**的变体（`Http` / `MissingConfig` / `Service` …），
+//!   便于调用方按类型决定「提示用户」「重试」还是「上报」；
+//! - 应用层（`app`）在边界补操作上下文与日志，并决定退出码；
+//! - [`Error::is_retryable`] 统一回答「值不值得自动重试」，避免各处自己判断状态码。
+//!
+//! 依赖方向上有一点刻意：`wreq::Error` 的转换**不在本模块**，而在 `oxidict-net`
+//! 的 `NetErr` trait。因为 core 不依赖 wreq，加一个 `From<wreq::Error>` 会把
+//! HTTP 客户端拖进内核。
+
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;

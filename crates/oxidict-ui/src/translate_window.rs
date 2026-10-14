@@ -4,6 +4,7 @@
 //! 结果卡片（加载/结果/错误三态），以及复制、交换语言等操作。
 //! 布局与原版一致：标题栏 -> 语言行 -> 源文本 -> 操作行 -> 结果卡片列表。
 
+use crate::tokens::Text;
 use gpui_kit::base::IndexPath;
 use gpui_kit::base::{h_flex, v_flex};
 use gpui_kit::component::button::Button;
@@ -70,6 +71,13 @@ pub struct TranslateWindow {
     scroll: ScrollHandle,
     /// dynamic_translate 的防抖代次，每次文本变化 +1，延迟后比较代次决定是否翻译。
     dynamic_generation: std::cell::Cell<u64>,
+    /// 本轮翻译的代次。每次 `run_translate` +1；异步回调据此丢弃上一轮的
+    /// 迟到结果（否则连按两次「翻译」时，旧结果会覆盖新结果）。
+    run_generation: u64,
+    /// 本轮仍在进行中的服务实例数。完成判定以此为准，**不能**用「有没有卡片
+    /// 处于 Loading」来判断——流式回调会把卡片提前置为 Done，导致其它实例还在
+    /// 翻译时就误判为全部完成，进而提前自动复制并关闭窗口。
+    pending: usize,
 }
 
 impl TranslateWindow {
@@ -118,6 +126,8 @@ impl TranslateWindow {
             cards,
             scroll: ScrollHandle::new(),
             dynamic_generation: std::cell::Cell::new(0),
+            run_generation: 0,
+            pending: 0,
         };
 
         // dynamic_translate：文本变化后 500ms 防抖自动翻译。
@@ -245,12 +255,24 @@ impl TranslateWindow {
             }
         }
 
+        // 新一轮翻译：递增代次并重置计数。上一轮未结束的异步回调会因为代次
+        // 不匹配而被丢弃，不会污染本轮卡片。
+        let instances = self.instances.clone();
+        if instances.is_empty() {
+            // 没有任何启用实例：与旧行为一致，不做任何结束处理（无结果可复制）。
+            return;
+        }
+
+        self.run_generation += 1;
+        let run_gen = self.run_generation;
+        // 计数以实际发起的请求数为准（每个 instance 一个任务）。
+        self.pending = instances.len();
+
         for card in self.cards.iter_mut() {
             card.state = CardState::Loading;
         }
         cx.notify();
 
-        let instances = self.instances.clone();
         for (idx, instance) in instances.into_iter().enumerate() {
             // 流式增量：LLM 类服务经 on_stream 回调推送累计文本，
             // 回调在 tokio 线程上执行，用 channel 转回 GPUI 更新卡片。
@@ -266,6 +288,9 @@ impl TranslateWindow {
                 while let Some(delta) = stream_rx.recv().await {
                     let text = delta.trim_end_matches('_').to_string();
                     let _ = this.update(cx, |this, cx| {
+                        if this.run_generation != run_gen {
+                            return;
+                        }
                         if let Some(card) = this.cards.get_mut(idx) {
                             card.state = CardState::Done(TranslateResult::Plain(text));
                         }
@@ -276,7 +301,9 @@ impl TranslateWindow {
             .detach();
 
             // 全部实例的任务都结束后执行 auto_copy / hide_window（见
-            // `on_translate_finished`）；流式上屏只改中间态，不参与完成判定。
+            // `on_translate_finished`）。完成判定用 `pending` 计数：流式回调会把
+            // 卡片提前置为 Done，若改用「是否还有 Loading 卡片」判断，会在其它
+            // 服务仍在翻译时就误判完成，提前自动复制并关闭窗口。
             cx.spawn_in(window, async move |this, cx| {
                 let state = match task.await {
                     Ok(Ok(result)) => CardState::Done(result),
@@ -287,15 +314,15 @@ impl TranslateWindow {
                     }
                 };
                 let _ = this.update_in(cx, |this, window, cx| {
+                    // 代次不匹配：本轮已被新的翻译取代，丢弃这个迟到结果。
+                    if this.run_generation != run_gen {
+                        return;
+                    }
                     if let Some(card) = this.cards.get_mut(idx) {
                         card.state = state;
                     }
-                    if !this.cards.is_empty()
-                        && !this
-                            .cards
-                            .iter()
-                            .any(|card| matches!(card.state, CardState::Loading))
-                    {
+                    this.pending = this.pending.saturating_sub(1);
+                    if this.pending == 0 {
                         this.on_translate_finished(window, cx);
                     }
                     cx.notify();
@@ -476,7 +503,7 @@ impl TranslateWindow {
                             )
                             .child(
                                 div()
-                                    .text_size(px(12.))
+                                    .text_size(Text::Body.size())
                                     .text_color(theme.colors.muted_foreground)
                                     .child(name),
                             ),
@@ -506,8 +533,10 @@ impl Render for TranslateWindow {
         let hide_language = config().get_or(keys::HIDE_LANGUAGE, false);
 
         v_flex()
+            .on_key_down(crate::escape_listener())
             .size_full()
-            .bg(theme.colors.background)
+            // 毛玻璃开启时压低根背景不透明度，让窗口材质层透出（见 window_root_bg）。
+            .bg(crate::window_root_bg(theme.colors.background))
             .text_color(theme.colors.foreground)
             // 标题栏：透明样式下兼任拖拽区
             .child(
@@ -523,7 +552,7 @@ impl Render for TranslateWindow {
                     .border_color(theme.colors.border)
                     .child(
                         div()
-                            .text_size(px(13.))
+                            .text_size(Text::Label.size())
                             .font_weight(FontWeight::MEDIUM)
                             .child(SharedString::from(t("translate-title"))),
                     )

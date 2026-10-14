@@ -119,12 +119,12 @@ recognize-window-title = Oxidict · OCR
 
 ## Backup
 config-nav-backup = Backup
-config-backup-webdav-hint = WebDAV cloud backup (enter server URL and credentials, then upload/restore)
+config-backup-webdav-hint = Choose where backups go: a WebDAV server, or a local folder (e.g. an iCloud/OneDrive sync folder)
 config-backup-server = Server URL
 config-backup-username = Username
 config-backup-password = Password
-config-backup-to-cloud = Backup to cloud
-config-backup-from-cloud = Restore from cloud
+config-backup-to-cloud = Backup now
+config-backup-from-cloud = Restore from backup
 config-backup-local-hint = Local backup (save as zip file or restore from backup file)
 config-backup-export = Export to file
 config-backup-import = Import from file
@@ -133,7 +133,7 @@ config-proxy-username = Proxy username
 config-proxy-password = Proxy password
 config-no-proxy = Bypass proxy for
 
-## 托盘补充
+## Tray (supplement)
 tray-auto-copy = Auto Copy
 tray-copy-source = Source
 tray-copy-target = Target
@@ -142,3 +142,73 @@ tray-copy-disable = Disable
 tray-check-update = Check Update
 tray-view-log = View Log
 tray-restart = Restart
+
+## Restore confirmation / history search / appearance
+config-backup-empty = No backups available
+config-backup-pick = Restore this backup
+config-restore-confirm-remote = Restore from cloud backup { $name }, overwriting the current config and history
+config-restore-confirm-local = Restore from oxidict-backup.zip in the config directory, overwriting the current config and history
+config-restore-snapshot-note = The current config and history are saved as *.pre-restore.bak before overwriting, so you can roll back.
+config-restore-confirm = Confirm restore
+config-history-search = Search source or translation
+config-history-no-match = No matching history
+config-history-copy = Copy translation
+config-language = Interface language
+config-theme = Theme
+config-theme-system = Follow system
+config-theme-light = Light
+config-theme-dark = Dark
+
+## Backup/restore status messages
+config-backup-uploaded = Backup saved: { $name }
+config-backup-upload-failed = Backup failed: { $error }
+config-backup-list-fetching = Fetching backup list…
+config-backup-list-count = { $count } backups in the cloud; pick one to restore
+config-backup-list-failed = Failed to fetch backup list: { $error }
+config-backup-export-done = Exported to oxidict-backup.zip in the config directory
+config-backup-export-failed = Export failed: { $error }
+config-restore-restoring = Restoring { $name }…
+config-restore-done = Restored from backup { $name }; the previous data was saved as *.pre-restore.bak
+config-restore-done-local = Restored from the local backup; the previous data was saved as *.pre-restore.bak
+config-restore-failed = Restore failed: { $error }
+config-hotkey-placeholder = Click, then press keys
+
+## Backup backend selection
+config-backup-type = Backup location
+config-backup-type-webdav = WebDAV server
+config-backup-type-local = Local folder
+config-backup-folder = Backup folder
+config-backup-uploading = Backing up: { $name }
+
+## Interface font
+config-font = Interface font
+config-font-size = Interface font size
+config-font-system = Leave empty to use the system font
+
+## Custom services
+config-nav-custom = Custom services
+config-custom-intro = Add a "single request + extract from JSON" translation service: save and it takes effect immediately, no restart. For complex cases (multi-step requests, signing, HTML parsing) use a .potext plugin.
+config-custom-id = Service id
+config-custom-endpoint = Endpoint
+config-custom-method = Method
+config-custom-auth = Authentication
+config-custom-auth-name = Parameter name
+config-custom-body = Request body template (JSON, optional)
+config-custom-extract = Translation path
+config-custom-tls = HTTP fingerprint
+config-custom-save = Save and apply
+config-custom-delete = Delete
+config-custom-list = Configured
+config-custom-empty = No custom services yet
+config-custom-saved = Saved and applied
+config-custom-auth-none = No authentication
+config-custom-auth-bearer = Bearer token
+config-custom-auth-header = Custom header
+config-custom-auth-query = Query parameter
+
+## Pagination / drag fallback / custom service editing
+config-history-more = Load more
+config-move-to-end = Drop here to move to the end
+config-custom-edit = Edit
+config-custom-editing = Loaded into the form; click "Save and apply" after editing
+config-custom-edit-unsupported = Signed entries can't be edited in the form; edit config.json instead

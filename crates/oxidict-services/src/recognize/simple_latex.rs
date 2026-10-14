@@ -45,11 +45,11 @@ impl Recognizer for SimpleLatex {
     async fn recognize(&self, req: RecognizeRequest) -> Result<String> {
         let token = req.str("token").unwrap_or_default();
 
-        let part = reqwest::multipart::Part::bytes(req.image.clone())
+        let part = wreq::multipart::Part::bytes(req.image.clone())
             .file_name("pot_screenshot_cut.png")
             .mime_str("image/png")
             .map_err(|e| Error::Service(format!("构造图片表单失败: {e}")))?;
-        let form = reqwest::multipart::Form::new().part("file", part);
+        let form = wreq::multipart::Form::new().part("file", part);
 
         let resp = post_with_headers(URL, &[("token", token)])
             .multipart(form)

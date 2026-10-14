@@ -1,11 +1,12 @@
 //! 识别窗口。
 //!
-//! 对应原 `src/window/Recognize`：截图后 OCR。上部图片区（本版本 gpui 无 `img`
-//! 元素，用占位框 + 文件大小文本代替），下部结果文本区，底部「开始识别」与
-//! 「复制结果」按钮。
+//! 对应原 `src/window/Recognize`：截图后 OCR。上部图片区（**尚未接入图片渲染**，
+//! 当前用占位框 + 文件大小文本代替；gpui 侧 `img()` 可用，缺的是把截图字节转成
+//! `ImageSource` 的接入），下部结果文本区，底部「开始识别」与「复制结果」按钮。
 //!
 //! 注意：三个薄窗口文件互不引用，各自独立。
 
+use crate::tokens::Text;
 use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
 use gpui_kit::component::Root;
@@ -13,17 +14,20 @@ use gpui_kit::component::button::Button;
 use gpui_kit::component::button::ButtonVariants as _;
 use gpui_kit::component::{ActiveTheme, Disableable, IconName, Sizable};
 use gpui_kit::{
-    AnyElement, App, Bounds, ClickEvent, ClipboardItem, Context, FontWeight, InteractiveElement,
-    IntoElement, ParentElement, Point, Render, SharedString, Size, Styled, TitlebarOptions, Window,
-    WindowBounds, WindowKind, WindowOptions, div, px,
+    AnyElement, App, Bounds, ClickEvent, ClipboardItem, Context, FontWeight, Image, ImageFormat,
+    InteractiveElement, IntoElement, ParentElement, Point, Render, SharedString, Size, Styled,
+    TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions, div, img, px,
 };
 use oxidict_core::config::{config, keys};
 use oxidict_core::i18n::{t, t_args};
 use oxidict_core::{Language, RecognizeRequest};
 use oxidict_services::spawn_recognize;
+use std::sync::Arc;
 
 pub struct RecognizeWindow {
     image: Option<Vec<u8>>,
+    /// 截图的渲染形态。提前解码一次并缓存，避免每帧重复解码 PNG。
+    preview: Option<Arc<Image>>,
     language: Language,
     instances: Vec<String>,
     text: String,
@@ -34,10 +38,20 @@ pub struct RecognizeWindow {
 impl RecognizeWindow {
     pub fn new(image: Option<Vec<u8>>) -> Self {
         let store = config();
-        let language = store.source_language();
+        // 识别语言用 `recognize_language`，不是翻译的源语言。两者是独立配置项，
+        // 取错会让用户在 OCR 页设置的语言完全不生效。
+        let language = store
+            .get::<String>(keys::RECOGNIZE_LANGUAGE)
+            .and_then(|s| Language::from_code(&s))
+            .unwrap_or(Language::Auto);
         let instances = store.service_list(keys::RECOGNIZE_SERVICE_LIST);
+        // 截图预览：把 PNG 字节转成 gpui 的 `Image`（构造不需要 window）。
+        let preview = image
+            .as_ref()
+            .map(|bytes| Arc::new(Image::from_bytes(ImageFormat::Png, bytes.clone())));
         Self {
             image,
+            preview,
             language,
             instances,
             text: String::new(),
@@ -68,6 +82,8 @@ impl RecognizeWindow {
             image,
             language,
             config: Default::default(),
+            // 指纹档位由 services 层按实例配置补上（`recognize_instance` 会覆盖）。
+            tls: Default::default(),
         };
 
         self.recognizing = true;
@@ -127,25 +143,18 @@ impl RecognizeWindow {
 
     fn render_image(&self, cx: &Context<Self>) -> AnyElement {
         let theme = cx.theme();
-        match &self.image {
-            Some(bytes) => {
-                let bytes_label = bytes.len().to_string();
-                v_flex()
-                    .size_full()
-                    .items_center()
-                    .justify_center()
-                    .rounded_md()
-                    .border_1()
-                    .border_color(theme.colors.border)
-                    .bg(theme.colors.muted)
-                    .text_color(theme.colors.muted_foreground)
-                    .text_size(px(12.))
-                    .child(SharedString::from(t_args(
-                        "recognize-image-bytes",
-                        &[("bytes", &bytes_label)],
-                    )))
-                    .into_any_element()
-            }
+        match &self.preview {
+            // 有截图就直接渲染预览。`img` 接受 `Arc<Image>`（`ImageSource`），
+            // 默认 ObjectFit 为 Contain 等比缩放——早先误以为「gpui 没有 img
+            // 元素」而只显示字节数，用户看不到自己截了什么。
+            Some(preview) => div()
+                .size_full()
+                .rounded_md()
+                .overflow_hidden()
+                .border_1()
+                .border_color(theme.colors.border)
+                .child(img(preview.clone()).size_full())
+                .into_any_element(),
             None => v_flex()
                 .size_full()
                 .items_center()
@@ -154,7 +163,7 @@ impl RecognizeWindow {
                 .border_1()
                 .border_color(theme.colors.border)
                 .text_color(theme.colors.muted_foreground)
-                .text_size(px(12.))
+                .text_size(Text::Body.size())
                 .child(SharedString::from(t("recognize-no-image")))
                 .into_any_element(),
         }
@@ -165,8 +174,10 @@ impl Render for RecognizeWindow {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         v_flex()
+            .on_key_down(crate::escape_listener())
             .size_full()
-            .bg(theme.colors.background)
+            // 毛玻璃开启时压低根背景不透明度，让窗口材质层透出（见 window_root_bg）。
+            .bg(crate::window_root_bg(theme.colors.background))
             .text_color(theme.colors.foreground)
             .child(
                 h_flex()
@@ -181,7 +192,7 @@ impl Render for RecognizeWindow {
                     .border_color(theme.colors.border)
                     .child(
                         div()
-                            .text_size(px(13.))
+                            .text_size(Text::Label.size())
                             .font_weight(FontWeight::MEDIUM)
                             .child(SharedString::from(t("recognize-window-title"))),
                     )
@@ -214,7 +225,7 @@ impl Render for RecognizeWindow {
                     .border_1()
                     .border_color(theme.colors.border)
                     .p_2()
-                    .text_size(px(12.))
+                    .text_size(Text::Body.size())
                     .text_color(theme.colors.foreground)
                     .child(SharedString::from(self.text.clone())),
             )
@@ -278,6 +289,8 @@ pub fn open_recognize_with_image(cx: &mut App, image: Vec<u8>) {
         focus: true,
         show: true,
         kind: WindowKind::Normal,
+        // 与设置/更新/通知窗口一致：`transparent` 开启时用系统毛玻璃材质。
+        window_background: crate::window_background_appearance(),
         ..Default::default()
     };
 

@@ -104,7 +104,11 @@ async fn plugin_loop(rx: &mut mpsc::UnboundedReceiver<Request>) {
     }
 }
 
-/// 加载插件（同步阻塞直到完成）。可在任意线程调用，包括 CLI 与 GPUI 主线程。
+/// 加载插件（同步阻塞直到完成）。
+///
+/// 可在 CLI 与 GPUI 主线程等**非 tokio 运行时上下文**调用；内部用
+/// `Handle::block_on` 等待专职插件线程，若在 tokio 工作线程或 `block_on`
+/// 内部调用会 panic（调用点须在独立线程上）。
 pub fn load(plugin_id: &str, dir: &Path) -> Result<()> {
     let (reply_tx, reply_rx) = oneshot::channel();
     send(Request::Load {

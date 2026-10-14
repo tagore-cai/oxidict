@@ -114,6 +114,72 @@ fn process_alive(_pid: u32) -> bool {
     true
 }
 
+/// 创建锁文件并**在同一句柄内**写入当前 PID。
+///
+/// 分两步（先 `create_new` 再单独 `fs::write`）会留出一个窗口：此时文件已存在
+/// 但内容为空，另一个刚开始启动的实例读不到有效 PID，会把它误判成崩溃残留的
+/// 脏锁并删除，于是两个实例同时运行。
+fn create_lock_file(lock_path: &std::path::Path) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(lock_path)?;
+    write!(f, "{}", std::process::id())?;
+    f.flush()?;
+    Ok(())
+}
+
+/// 判断锁文件是否为「脏锁」（持有者进程已退出）。
+///
+/// 锁文件刚被 `create_new` 出来、PID 尚未写入时读到的可能是空内容；这里在
+/// 判定前短暂重试，避免把「正在启动的实例」误判为脏锁而造成双开。
+fn lock_is_stale(lock_path: &std::path::Path) -> bool {
+    const ATTEMPTS: u32 = 10;
+    const RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(25);
+    for attempt in 0..ATTEMPTS {
+        if let Ok(content) = std::fs::read_to_string(lock_path)
+            && let Ok(pid) = content.trim().parse::<u32>()
+        {
+            // PID 与自身相同说明是上次重启残留的自有锁，不算脏锁。
+            return pid != std::process::id() && !process_alive(pid);
+        }
+        if attempt + 1 < ATTEMPTS {
+            std::thread::sleep(RETRY_DELAY);
+        }
+    }
+    // 多次重试后仍读不到有效 PID：按崩溃残留的空文件处理。
+    true
+}
+
+/// 申请单实例锁。返回 `true` 表示本进程成功持锁，`false` 表示已有实例在运行。
+fn acquire_instance_lock(lock_path: &std::path::Path) -> bool {
+    // 锁落在 dirs::runtime_dir()（macOS 上不存在）回退到的 cache_dir，目录不保证
+    // 已存在（干净 HOME、手工清过缓存、首次运行）。缺目录会让 create_new 失败，
+    // 与「已有实例」表现一致而误退出，故先补建。
+    if let Some(parent) = lock_path.parent()
+        && let Err(e) = std::fs::create_dir_all(parent)
+    {
+        log::warn!("创建锁文件目录失败 {}: {e}", parent.display());
+    }
+
+    match create_lock_file(lock_path) {
+        Ok(()) => true,
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            if !lock_is_stale(lock_path) {
+                return false;
+            }
+            let _ = std::fs::remove_file(lock_path);
+            create_lock_file(lock_path).is_ok()
+        }
+        Err(e) => {
+            log::warn!("创建锁文件失败 {}: {e}", lock_path.display());
+            // 无法创建锁时不阻断启动：宁可放弃单实例保护，也不要让应用打不开。
+            true
+        }
+    }
+}
+
 fn main() {
     init_logger();
 
@@ -126,49 +192,9 @@ fn main() {
 
     // 0.5 单实例保护：锁文件 + PID 检测（脏锁自动清理）。
     let lock_path = oxidict_core::config::runtime_lock_path();
-    // 锁落在 dirs::runtime_dir()（macOS 上不存在）回退到的 cache_dir，目录不保证
-    // 已存在（干净 HOME、手工清过缓存、首次运行）。缺目录会让 create_new 失败，
-    // 与「已有实例」表现一致而误退出，故先补建。
-    if let Some(parent) = lock_path.parent()
-        && let Err(e) = std::fs::create_dir_all(parent)
-    {
-        log::warn!("创建锁文件目录失败 {}: {e}", parent.display());
-    }
-    let lock_created = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&lock_path);
-    match lock_created {
-        Ok(_) => {
-            // 成功创建，写入 PID 供后续脏锁检测。
-            let _ = std::fs::write(&lock_path, std::process::id().to_string());
-        }
-        Err(_) => {
-            // 文件已存在，检查是否为脏锁（PID 对应进程已死）。
-            let stale = std::fs::read_to_string(&lock_path)
-                .ok()
-                .and_then(|s| s.trim().parse::<u32>().ok())
-                .map(|pid| pid != std::process::id() && !process_alive(pid))
-                .unwrap_or(true); // 读不到或解析失败视为脏锁
-
-            if stale {
-                let _ = std::fs::remove_file(&lock_path);
-                if std::fs::OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(&lock_path)
-                    .is_ok()
-                {
-                    let _ = std::fs::write(&lock_path, std::process::id().to_string());
-                } else {
-                    eprintln!("无法创建锁文件 {}，退出。", lock_path.display());
-                    std::process::exit(0);
-                }
-            } else {
-                eprintln!("检测到另一个 oxidict 实例正在运行，退出。");
-                std::process::exit(0);
-            }
-        }
+    if !acquire_instance_lock(&lock_path) {
+        eprintln!("检测到另一个 oxidict 实例正在运行，退出。");
+        std::process::exit(0);
     }
 
     // 1. 配置：沿用老版本 config.json，老用户配置直接迁移。

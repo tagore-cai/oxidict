@@ -10,7 +10,6 @@ use oxidict_core::map_language;
 use oxidict_core::model::{DictResult, Pronunciation};
 use oxidict_core::schema::ConfigField;
 use oxidict_core::{Error, Language, Result, TranslateRequest, TranslateResult};
-use oxidict_net::get_value;
 use serde_json::Value;
 
 pub struct BingDict;
@@ -26,7 +25,7 @@ impl Translator for BingDict {
     }
 
     fn config_schema(&self) -> Vec<ConfigField> {
-        vec![]
+        vec![crate::tls_field()]
     }
 
     fn map_language(&self, lang: Language) -> String {
@@ -69,7 +68,7 @@ impl Translator for BingDict {
             APP_ID
         );
 
-        let res: Value = get_value(url).await?;
+        let res: Value = oxidict_net::get_value_for(req.tls, url).await?;
 
         let value = res
             .get("value")

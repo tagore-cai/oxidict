@@ -21,6 +21,7 @@ impl Translator for Transmart {
 
     fn config_schema(&self) -> Vec<ConfigField> {
         vec![
+            crate::tls_field(),
             ConfigField::Text {
                 key: "username",
                 label: "用户名",
@@ -65,7 +66,8 @@ impl Translator for Transmart {
         });
 
         let result: Value =
-            oxidict_net::post_json_value("https://transmart.qq.com/api/imt", &body).await?;
+            oxidict_net::post_json_value_for(req.tls, "https://transmart.qq.com/api/imt", &body)
+                .await?;
         let lines = result
             .get("auto_translation")
             .and_then(|v| v.as_array())

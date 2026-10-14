@@ -3,6 +3,7 @@
 //! 对应原 `src/window/Updater`：显示当前版本，「检查更新」按钮拉取 GitHub
 //! latest release 接口，「前往下载」按钮用系统浏览器打开发布页。
 
+use crate::tokens::Text;
 use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
 use gpui_kit::component::Root;
@@ -83,7 +84,7 @@ impl UpdaterWindow {
         if let Some(error) = &self.error {
             return div()
                 .text_color(theme.colors.danger)
-                .text_size(px(12.))
+                .text_size(Text::Body.size())
                 .child(SharedString::from(error.clone()))
                 .into_any_element();
         }
@@ -93,7 +94,7 @@ impl UpdaterWindow {
                 .child(
                     div()
                         .text_color(theme.colors.foreground)
-                        .text_size(px(13.))
+                        .text_size(Text::Label.size())
                         .child(SharedString::from(t_args(
                             "updater-latest-version",
                             &[("version", latest.as_str())],
@@ -102,14 +103,14 @@ impl UpdaterWindow {
                 .child(
                     div()
                         .text_color(theme.colors.muted_foreground)
-                        .text_size(px(12.))
+                        .text_size(Text::Body.size())
                         .child(SharedString::from(self.body.clone().unwrap_or_default())),
                 )
                 .into_any_element();
         }
         div()
             .text_color(theme.colors.muted_foreground)
-            .text_size(px(12.))
+            .text_size(Text::Body.size())
             .child(SharedString::from(t("updater-hint")))
             .into_any_element()
     }
@@ -135,7 +136,7 @@ impl Render for UpdaterWindow {
                     .border_color(theme.colors.border)
                     .child(
                         div()
-                            .text_size(px(13.))
+                            .text_size(Text::Label.size())
                             .font_weight(FontWeight::MEDIUM)
                             .child(SharedString::from(format!(
                                 "{} · v{}",
@@ -174,7 +175,7 @@ impl Render for UpdaterWindow {
                             )
                             .child(if self.checking {
                                 div()
-                                    .text_size(px(12.))
+                                    .text_size(Text::Body.size())
                                     .text_color(theme.colors.muted_foreground)
                                     .child(SharedString::from(t("updater-checking")))
                                     .into_any_element()

@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Oxidict 插件运行时：.potext（QuickJS 脚本）宿主，不依赖窗口与渲染循环"
 
 [dependencies]
 oxidict-core.workspace = true
@@ -12,14 +13,11 @@ oxidict-net.workspace = true
 rquickjs.workspace = true
 async-trait.workspace = true
 base64.workspace = true
-parking_lot.workspace = true
 once_cell.workspace = true
 zip.workspace = true
 walkdir.workspace = true
-serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-anyhow.workspace = true
 log.workspace = true
 tokio.workspace = true
 

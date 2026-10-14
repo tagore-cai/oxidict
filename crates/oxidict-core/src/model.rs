@@ -3,6 +3,7 @@
 //! 对应原 JS 侧翻译结果的两种形态：纯译文字符串 与 结构化词典结果。
 //! GPUI 视图层根据 `TranslateResult` 的变体决定渲染 `Textarea` 还是词典卡片。
 
+use crate::TlsProfile;
 use crate::language::Language;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -150,6 +151,19 @@ mod tests {
         assert!(req.require_str("empty", "API Key").is_err());
         assert!(req.require_str("nope", "API Key").is_err());
     }
+
+    /// 默认必须是「不模拟指纹」：绝大多数服务调官方 API，模拟浏览器只会
+    /// 白付一次握手代价，还可能因头部与官方文档不符而出错。
+    #[test]
+    fn translate_request_defaults_to_native_tls() {
+        let req = TranslateRequest::new("t", Language::Auto, Language::ZhCn);
+        assert_eq!(req.tls, TlsProfile::Native);
+        assert!(!req.tls.is_emulated());
+
+        let req = req.with_tls(TlsProfile::Chrome);
+        assert_eq!(req.tls, TlsProfile::Chrome);
+        assert!(req.tls.is_emulated());
+    }
 }
 
 impl From<String> for TranslateResult {
@@ -219,6 +233,8 @@ pub struct TranslateRequest {
     pub detect: Option<Language>,
     pub config: ServiceConfig,
     pub on_stream: Option<StreamSink>,
+    /// HTTP 指纹档位（实例配置的 `tls`）。网页端点被 WAF 按指纹拦时才需要。
+    pub tls: TlsProfile,
 }
 
 impl TranslateRequest {
@@ -230,6 +246,7 @@ impl TranslateRequest {
             detect: None,
             config: ServiceConfig::new(),
             on_stream: None,
+            tls: TlsProfile::default(),
         }
     }
 
@@ -247,6 +264,11 @@ impl TranslateRequest {
         self.on_stream = Some(sink);
         self
     }
+
+    pub fn with_tls(mut self, tls: TlsProfile) -> Self {
+        self.tls = tls;
+        self
+    }
 }
 
 impl HasConfig for TranslateRequest {
@@ -261,6 +283,8 @@ pub struct RecognizeRequest {
     pub image: Vec<u8>,
     pub language: Language,
     pub config: ServiceConfig,
+    /// HTTP 指纹档位（实例配置的 `tls`）。
+    pub tls: TlsProfile,
 }
 
 impl HasConfig for RecognizeRequest {
@@ -275,6 +299,8 @@ pub struct TtsRequest {
     pub text: String,
     pub language: Language,
     pub config: ServiceConfig,
+    /// HTTP 指纹档位（实例配置的 `tls`）。
+    pub tls: TlsProfile,
 }
 
 impl HasConfig for TtsRequest {
@@ -289,6 +315,8 @@ pub struct CollectionRequest {
     pub source: String,
     pub target: String,
     pub config: ServiceConfig,
+    /// HTTP 指纹档位（实例配置的 `tls`）。
+    pub tls: TlsProfile,
 }
 
 impl HasConfig for CollectionRequest {

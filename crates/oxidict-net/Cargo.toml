@@ -4,14 +4,14 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Oxidict 网络层：wreq HTTP 客户端与浏览器指纹模拟、服务签名算法、WebDAV/本地目录备份传输"
 
 [dependencies]
 oxidict-core.workspace = true
-reqwest.workspace = true
+wreq.workspace = true
+wreq-util.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-thiserror.workspace = true
-anyhow.workspace = true
 hmac.workspace = true
 sha1.workspace = true
 sha2.workspace = true
@@ -21,13 +21,10 @@ base64.workspace = true
 uuid.workspace = true
 rand.workspace = true
 chrono.workspace = true
-urlencoding.workspace = true
-tokio.workspace = true
 futures.workspace = true
 log.workspace = true
-async-trait.workspace = true
-url.workspace = true
 parking_lot.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true

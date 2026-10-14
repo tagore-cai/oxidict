@@ -19,6 +19,11 @@ impl Translator for Yandex {
         "yandex"
     }
 
+    fn config_schema(&self) -> Vec<oxidict_core::schema::ConfigField> {
+        // 网页端点：可切指纹档位（见 services::tls_field 的说明）。
+        vec![crate::tls_field()]
+    }
+
     fn map_language(&self, lang: Language) -> String {
         map_language!(lang, {
             Auto => "",
@@ -35,7 +40,7 @@ impl Translator for Yandex {
         let id = format!("{}-0-0", oxidict_net::uuid_v4().replace('-', ""));
         let url = format!("{}?id={}&srv=android", URL, urlencoding::encode(&id));
 
-        let resp = oxidict_net::client()
+        let resp = oxidict_net::client_for(req.tls)
             .post(&url)
             .header("Content-Type", "application/x-www-form-urlencoded")
             .header("User-Agent", UA)

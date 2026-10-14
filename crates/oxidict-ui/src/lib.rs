@@ -9,6 +9,7 @@ pub mod input_translate;
 pub mod logos;
 pub mod notify;
 pub mod recognize;
+pub mod tokens;
 pub mod translate_window;
 pub mod tray;
 pub mod updater;
@@ -16,11 +17,12 @@ pub mod updater;
 use gpui_kit::AppContext as _;
 use gpui_kit::component::Root;
 use gpui_kit::{
-    App, Bounds, Pixels, Point, Size, TitlebarOptions, WindowBounds, WindowHandle, WindowKind,
-    WindowOptions, px,
+    App, Bounds, Pixels, Point, Size, TitlebarOptions, Window, WindowBounds, WindowHandle,
+    WindowKind, WindowOptions, px,
 };
 use gpui_kit::{Global, WeakEntity};
 use oxidict_core::config::{config, keys};
+use oxidict_core::i18n::t;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::translate_window::TranslateWindow;
@@ -124,6 +126,45 @@ fn mouse_follow_origin(width: f32, height: f32) -> Point<Pixels> {
     Point { x: px(x), y: px(y) }
 }
 
+/// 启动时按配置恢复主题。
+///
+/// `gpui_component::init` 会把主题强制设成 Light；若不在此显式恢复，用户保存的
+/// `app_theme` 会被静默忽略——应用每次都以浅色启动，且默认值 `"system"`
+/// （跟随系统深色）永远不会生效。必须在**窗口已就绪**后调用，因为「跟随系统」
+/// 需要读取窗口外观。设置页切换主题时也复用本函数。
+pub(crate) fn apply_saved_theme(window: &mut Window, cx: &mut App) {
+    use gpui_kit::component::ThemeMode;
+    let saved: String = config().get_or(keys::APP_THEME, String::from("system"));
+    let mode = match saved.as_str() {
+        "dark" => ThemeMode::Dark,
+        "light" => ThemeMode::Light,
+        // 其它值（含默认 "system"）：跟随当前窗口外观（macOS/Windows 深色模式）。
+        _ => ThemeMode::from(window.appearance()),
+    };
+    // 主题模式与字体配置（`app_font` / `app_font_size`）必须一起应用：
+    // 两边各调一次 `Theme::change` 会互相覆盖，见 tokens::apply_font_config。
+    crate::tokens::apply_font_config(mode, Some(window), cx);
+}
+
+/// Esc 关窗的按键监听，**挂在窗口根元素上**（`.on_key_down`）。
+///
+/// 为什么不用 `window.on_key_event`：那个方法只能在 paint 阶段调用
+/// （`debug_assert_paint`），而 `View::render` 运行在 **layout** 阶段——在 render
+/// 里调用它会在启动时 panic（release 构建下表现为 key_dispatch 的
+/// `active_node()` unwrap，因为断言被编译掉了）。元素级 `on_key_down` 在 paint
+/// 阶段注册，是 gpui 的正规途径；且它在 action 绑定派发**之前**收到原始按键，
+/// 不会被输入框自己的 `escape → Escape` 绑定抢走。
+pub(crate) fn escape_listener() -> impl Fn(&gpui_kit::KeyDownEvent, &mut Window, &mut App) + 'static
+{
+    |event: &gpui_kit::KeyDownEvent, window, cx| {
+        if event.keystroke.key == "escape" {
+            // 输入框自身绑定了 escape → Escape action；先拦下再关窗。
+            cx.stop_propagation();
+            window.remove_window();
+        }
+    }
+}
+
 /// 打开翻译窗口。
 ///
 /// 尺寸取 `translate_window_width/height`，置顶跟随 `translate_always_on_top`；
@@ -155,7 +196,8 @@ pub fn open_translate_window(cx: &mut App) {
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),
         titlebar: Some(TitlebarOptions {
-            title: Some("沙拉翻译".into()),
+            // 标题走 i18n（创建时取一次；之后切语言不会改已开窗口的标题栏）。
+            title: Some(t("translate-title").into()),
             appears_transparent: true,
             ..Default::default()
         }),
@@ -166,10 +208,16 @@ pub fn open_translate_window(cx: &mut App) {
         } else {
             WindowKind::Normal
         },
+        // 与设置/更新/通知窗口一致：`transparent` 开启时用系统毛玻璃材质。
+        // 早期这三个主窗口只设了透明标题栏、没设窗口背景，结果是「标题栏透明 +
+        // 主体不透明」的割裂观感，而且「窗口毛玻璃」这个设置在它们身上完全无效。
+        window_background: window_background_appearance(),
         ..Default::default()
     };
 
     cx.open_window(options, |window, cx| {
+        // 窗口已就绪：在此恢复保存的主题（`system` 走窗口外观推导）。
+        apply_saved_theme(window, cx);
         let view = cx.new(|cx| translate_window::TranslateWindow::new(window, cx));
         // 记录弱引用，后续托盘/快捷键命令可复用此窗口。
         cx.set_global(TranslateWindowHandle {

@@ -119,12 +119,12 @@ recognize-window-title = 沙拉翻译 · 识别
 
 ## 备份
 config-nav-backup = 备份
-config-backup-webdav-hint = WebDAV 云端备份（填入服务器地址与凭据后可上传/恢复）
+config-backup-webdav-hint = 选择备份位置：WebDAV 服务器，或本机目录（可指向 iCloud/OneDrive 等同步目录）
 config-backup-server = 服务器地址
 config-backup-username = 用户名
 config-backup-password = 密码
-config-backup-to-cloud = 备份到云端
-config-backup-from-cloud = 从云端恢复
+config-backup-to-cloud = 立即备份
+config-backup-from-cloud = 从备份恢复
 config-backup-local-hint = 本地备份（保存为 zip 文件或从备份文件恢复）
 config-backup-export = 导出到文件
 config-backup-import = 从文件导入
@@ -142,3 +142,73 @@ tray-copy-disable = 关闭
 tray-check-update = 检查更新
 tray-view-log = 查看日志
 tray-restart = 重启应用
+
+## 恢复确认 / 历史检索 / 外观
+config-backup-empty = 没有可用的备份文件
+config-backup-pick = 恢复此备份
+config-restore-confirm-remote = 将从云端备份 { $name } 恢复，并覆盖当前配置与历史
+config-restore-confirm-local = 将从配置目录的 oxidict-backup.zip 恢复，并覆盖当前配置与历史
+config-restore-snapshot-note = 覆盖前会把现有配置与历史另存为 *.pre-restore.bak，可据此回退。
+config-restore-confirm = 确认覆盖恢复
+config-history-search = 搜索原文或译文
+config-history-no-match = 没有匹配的历史记录
+config-history-copy = 复制译文
+config-language = 界面语言
+config-theme = 主题
+config-theme-system = 跟随系统
+config-theme-light = 浅色
+config-theme-dark = 深色
+
+## 备份/恢复的操作反馈（状态行文案）
+config-backup-uploaded = 已保存备份: { $name }
+config-backup-upload-failed = 备份失败: { $error }
+config-backup-list-fetching = 正在获取备份列表…
+config-backup-list-count = 云端共 { $count } 份备份，请选择要恢复的一份
+config-backup-list-failed = 获取备份列表失败: { $error }
+config-backup-export-done = 已导出到配置目录 oxidict-backup.zip
+config-backup-export-failed = 导出失败: { $error }
+config-restore-restoring = 正在恢复 { $name }…
+config-restore-done = 已从备份恢复 { $name }；原数据已另存为 *.pre-restore.bak
+config-restore-done-local = 已从本地备份恢复；原数据已另存为 *.pre-restore.bak
+config-restore-failed = 恢复失败: { $error }
+config-hotkey-placeholder = 点击后按组合键
+
+## 备份后端选择
+config-backup-type = 备份位置
+config-backup-type-webdav = WebDAV 服务器
+config-backup-type-local = 本地目录
+config-backup-folder = 备份目录
+config-backup-uploading = 正在备份: { $name }
+
+## 界面字体
+config-font = 界面字体
+config-font-size = 界面字号
+config-font-system = 留空使用系统字体
+
+## 自定义服务
+config-nav-custom = 自定义服务
+config-custom-intro = 加一个"单次请求 + 从 JSON 取字段"的翻译服务：填完保存即生效，无需重启。复杂情形（多步请求、签名、HTML 解析）请用 .potext 插件。
+config-custom-id = 服务标识
+config-custom-endpoint = 接口地址
+config-custom-method = 请求方法
+config-custom-auth = 鉴权方式
+config-custom-auth-name = 参数名
+config-custom-body = 请求体模板（JSON，可空）
+config-custom-extract = 译文路径
+config-custom-tls = HTTP 指纹
+config-custom-save = 保存并生效
+config-custom-delete = 删除
+config-custom-list = 已配置
+config-custom-empty = 还没有自定义服务
+config-custom-saved = 已保存并生效
+config-custom-auth-none = 无需鉴权
+config-custom-auth-bearer = Bearer 令牌
+config-custom-auth-header = 自定义请求头
+config-custom-auth-query = 查询参数
+
+## 分页 / 拖拽兜底 / 自定义服务编辑
+config-history-more = 加载更多
+config-move-to-end = 拖到此处移到最后
+config-custom-edit = 编辑
+config-custom-editing = 已回填到表单，修改后点「保存并生效」
+config-custom-edit-unsupported = 签名类条目不支持表单编辑，请在 config.json 中修改

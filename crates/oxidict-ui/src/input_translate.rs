@@ -3,6 +3,7 @@
 //! 原版按快捷键弹出独立小窗（320x180），带 Textarea + 翻译按钮 + 结果显示。
 //! 按 Enter 翻译，Esc 关闭。与主翻译窗口独立，不共享状态。
 
+use crate::tokens::Text;
 use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -10,8 +11,9 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{ActiveTheme, Sizable};
 use gpui_kit::{
-    App, Bounds, Context, Entity, IntoElement, ParentElement, Point, Render, SharedString, Size,
-    Styled, TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions, div, px,
+    App, Bounds, Context, Entity, InteractiveElement, IntoElement, ParentElement, Point, Render,
+    SharedString, Size, Styled, TitlebarOptions, Window, WindowBounds, WindowKind, WindowOptions,
+    div, px,
 };
 use oxidict_core::TranslateRequest;
 use oxidict_core::config::config;
@@ -29,6 +31,9 @@ enum InputCardState {
 pub struct InputTranslateWindow {
     source: Entity<InputState>,
     state: InputCardState,
+    /// 本轮翻译代次。每次发起翻译 +1，异步回调据此丢弃上一轮的迟到结果，
+    /// 避免连按 Enter 时旧请求的流式片段覆盖新结果。
+    generation: u64,
 }
 
 impl InputTranslateWindow {
@@ -50,6 +55,7 @@ impl InputTranslateWindow {
         Self {
             source,
             state: InputCardState::Idle,
+            generation: 0,
         }
     }
 
@@ -64,6 +70,9 @@ impl InputTranslateWindow {
             return;
         };
 
+        // 新一轮：递增代次，上一轮未结束的回调会因代次不匹配而被丢弃。
+        self.generation += 1;
+        let generation = self.generation;
         self.state = InputCardState::Loading;
         cx.notify();
 
@@ -78,6 +87,9 @@ impl InputTranslateWindow {
             while let Some(delta) = stream_rx.recv().await {
                 let text = delta.trim_end_matches('_').to_string();
                 let _ = this.update(cx, |this, cx| {
+                    if this.generation != generation {
+                        return;
+                    }
                     this.state = InputCardState::Done(text);
                     cx.notify();
                 });
@@ -93,6 +105,9 @@ impl InputTranslateWindow {
                 Err(e) => InputCardState::Failed(format!("{e}")),
             };
             let _ = this.update(cx, |this, cx| {
+                if this.generation != generation {
+                    return;
+                }
                 this.state = state;
                 cx.notify();
             });
@@ -114,12 +129,12 @@ impl InputTranslateWindow {
 }
 
 impl Render for InputTranslateWindow {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
 
         let result_area: gpui_kit::AnyElement = match &self.state {
             InputCardState::Idle => div()
-                .text_size(px(12.))
+                .text_size(Text::Body.size())
                 .text_color(theme.colors.muted_foreground)
                 .child(t("translate-idle-hint"))
                 .into_any_element(),
@@ -128,26 +143,28 @@ impl Render for InputTranslateWindow {
                 .child(Spinner::new().small())
                 .child(
                     div()
-                        .text_size(px(12.))
+                        .text_size(Text::Body.size())
                         .text_color(theme.colors.muted_foreground)
                         .child(t("app-translating")),
                 )
                 .into_any_element(),
             InputCardState::Done(text) => div()
-                .text_size(px(13.))
+                .text_size(Text::Label.size())
                 .text_color(theme.colors.foreground)
                 .child(SharedString::from(text.clone()))
                 .into_any_element(),
             InputCardState::Failed(msg) => div()
-                .text_size(px(12.))
+                .text_size(Text::Body.size())
                 .text_color(theme.colors.danger)
                 .child(SharedString::from(msg.clone()))
                 .into_any_element(),
         };
 
         v_flex()
+            .on_key_down(crate::escape_listener())
             .size_full()
-            .bg(theme.colors.background)
+            // 毛玻璃开启时压低根背景不透明度，让窗口材质层透出（见 window_root_bg）。
+            .bg(crate::window_root_bg(theme.colors.background))
             .text_color(theme.colors.foreground)
             .p_2()
             .gap_2()
@@ -186,6 +203,8 @@ pub fn open_input_translate(cx: &mut App) {
         focus: true,
         show: true,
         kind: WindowKind::PopUp,
+        // 与设置/更新/通知窗口一致：`transparent` 开启时用系统毛玻璃材质。
+        window_background: crate::window_background_appearance(),
         ..Default::default()
     };
     cx.open_window(options, |window, cx| {

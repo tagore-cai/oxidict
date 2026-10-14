@@ -1,7 +1,8 @@
 //! 配置存储。
 //!
-//! 沿用 oxidict v4 的 `config.json`（`<config_dir>/allen.town.focus.oxidict/config.json`），
-//! 键名与结构保持完全一致，这样老用户的配置、服务实例、历史库可以无缝迁移。
+//! 沿用 oxidict v4 的 `config.json`（`<config_dir>/net.oxidict.app/config.json`，
+//! 见 [`APP_ID`]），键名与结构保持完全一致，这样老用户的配置、服务实例、
+//! 历史库可以无缝迁移。
 
 use crate::error::{Error, Result};
 use crate::language::Language;
@@ -21,6 +22,11 @@ pub mod keys {
     pub const RECOGNIZE_SERVICE_LIST: &str = "recognize_service_list";
     pub const TTS_SERVICE_LIST: &str = "tts_service_list";
     pub const COLLECTION_SERVICE_LIST: &str = "collection_service_list";
+    /// 配置驱动的自定义服务定义（数组，见 `oxidict-services` 的 `translate::custom`）。
+    ///
+    /// 存这里而不是单独文件：与原版「所有配置都在 config.json」的约定一致，
+    /// 也因此能被现有的导出/同步/恢复链路一并带上，不需要额外处理。
+    pub const CUSTOM_SERVICES: &str = "custom_services";
 
     pub const TRANSLATE_SOURCE_LANGUAGE: &str = "translate_source_language";
     pub const TRANSLATE_TARGET_LANGUAGE: &str = "translate_target_language";
@@ -45,6 +51,10 @@ pub mod keys {
     // 界面语言统一走 APP_LANGUAGE（对齐原版 app_language；ui_language 曾是
     // 重复设计，已删除，老配置里的该键会被忽略）。
     pub const APP_THEME: &str = "app_theme";
+    // 以下三个外观键为兼容原版 config.json 而保留（默认值会补齐、不会被清掉），
+    // 但当前版本不读取：字体族需要给全部窗口统一注入 font family；字号要生效
+    // 得把整个 UI 的 px() 迁到 rems()（gpui 的全局缩放基于 rem），收益小、
+    // 回归面大。详见 README「兼容但尚未生效的配置项」。
     pub const APP_FONT: &str = "app_font";
     pub const APP_FALLBACK_FONT: &str = "app_fallback_font";
     pub const APP_FONT_SIZE: &str = "app_font_size";
@@ -75,6 +85,8 @@ pub mod keys {
 
     // 备份
     pub const BACKUP_TYPE: &str = "backup_type";
+    /// 本地目录后端的目标目录（可指向 iCloud / OneDrive 等云盘同步目录）。
+    pub const BACKUP_FOLDER: &str = "backup_folder";
     pub const WEBDAV_URL: &str = "webdav_url";
     pub const WEBDAV_USERNAME: &str = "webdav_username";
     pub const WEBDAV_PASSWORD: &str = "webdav_password";
@@ -108,11 +120,24 @@ pub mod keys {
 static STORE: OnceCell<Arc<ConfigStore>> = OnceCell::new();
 
 /// 进程级配置单例。
+///
+/// 未初始化时 panic：这是**应用入口**的契约（`main` 起服务前必须调
+/// `ConfigStore::init`）。库代码里"读一下就有、没有也照样能跑"的场合请用
+/// [`store_opt`]。
 pub fn config() -> Arc<ConfigStore> {
     STORE
         .get()
         .expect("ConfigStore 未初始化，请在使用前调用 ConfigStore::init")
         .clone()
+}
+
+/// 全局配置（若尚未初始化则 `None`）。
+///
+/// 给库函数读取**可选**设置用（例如 HTTP 客户端的代理配置）。`config()` 在
+/// 未初始化时会 panic，对这类"没有代理就直连"的读取过于激进——测试环境、
+/// 独立工具函数都可能在没有初始化存储的情况下调用到。
+pub fn store_opt() -> Option<Arc<ConfigStore>> {
+    STORE.get().cloned()
 }
 
 pub fn set_global(store: Arc<ConfigStore>) {
@@ -137,6 +162,12 @@ pub fn runtime_lock_path() -> PathBuf {
 pub struct ConfigStore {
     path: PathBuf,
     data: RwLock<Map<String, Value>>,
+    /// 串行化落盘。
+    ///
+    /// 「取快照」与「rename 到目标路径」必须处于同一临界区：否则两个并发
+    /// `set` 会各自快照、再先后 rename，先取的旧快照若最后落地，就会把后写
+    /// 的键整段抹掉（配置丢失，且内存与磁盘从此不一致）。
+    save_lock: parking_lot::Mutex<()>,
 }
 
 impl ConfigStore {
@@ -150,6 +181,12 @@ impl ConfigStore {
     }
 
     pub fn init_with_path(path: PathBuf) -> Result<Arc<Self>> {
+        // 全局单例只初始化一次。重复调用直接返回既有实例，避免出现「本次返回值
+        // 与 `config()` 指向两个不同 store」的隐性分裂：那样配置的读与写会落在
+        // 互不可见的两份内存映射上，表现为「改了设置却不生效」。
+        if let Some(existing) = STORE.get() {
+            return Ok(existing.clone());
+        }
         let data = match std::fs::read_to_string(&path) {
             Ok(s) => match serde_json::from_str::<Map<String, Value>>(&s) {
                 Ok(m) => m,
@@ -175,6 +212,7 @@ impl ConfigStore {
         let store = Arc::new(Self {
             path,
             data: RwLock::new(data),
+            save_lock: parking_lot::Mutex::new(()),
         });
         store.apply_defaults();
         set_global(store.clone());
@@ -205,6 +243,8 @@ impl ConfigStore {
             ),
             (TTS_SERVICE_LIST, json!(["lingva_tts"])),
             (COLLECTION_SERVICE_LIST, json!([])),
+            // 自定义服务默认为空数组：用户往这里追加 spec 即增加服务。
+            (CUSTOM_SERVICES, json!([])),
             (TRANSLATE_SOURCE_LANGUAGE, json!("auto")),
             (TRANSLATE_TARGET_LANGUAGE, json!("zh_cn")),
             (TRANSLATE_REMEMBER_LANGUAGE, json!(true)),
@@ -257,6 +297,7 @@ impl ConfigStore {
             (keys::APP_LANGUAGE, json!("zh_cn")),
             // 备份
             (keys::BACKUP_TYPE, json!("webdav")),
+            (keys::BACKUP_FOLDER, json!("")),
             (keys::WEBDAV_URL, json!("")),
             (keys::WEBDAV_USERNAME, json!("")),
             (keys::WEBDAV_PASSWORD, json!("")),
@@ -304,7 +345,11 @@ impl ConfigStore {
     }
 
     /// 原子落盘：先写临时文件再 rename，避免崩溃时写坏 config.json。
+    ///
+    /// 整个「快照 -> 写临时文件 -> rename」在 `save_lock` 内串行执行，
+    /// 防止并发 `set` 的快照互相覆盖（见 `save_lock` 字段的说明）。
     pub fn save(&self) -> Result<()> {
+        let _guard = self.save_lock.lock();
         let snapshot = {
             let data = self.data.read();
             serde_json::to_string_pretty(&*data)?
@@ -412,20 +457,38 @@ pub fn parse_instance(instance: &str) -> (&str, Option<&str>) {
     }
 }
 
+/// 判断事件是否代表 `config.json` 自身发生了变化。
+///
+/// [`watch_config`] 监听整个应用目录，而该目录里还住着 `logs/`（日志持续写入）、
+/// `history.db`（翻译即写入）与 `plugins/`、单实例锁等。若不过滤，就会出现
+/// 「自己写日志 → 触发 reload → 回调重新应用设置 → 再写日志」的自激循环。
+/// 因此只认文件名 `config.json`（用文件名而非完整路径比较，避开 macOS 上
+/// `/tmp` 与 `/private/tmp` 之类的符号链接差异）。
+fn is_config_json_change(event: &notify::Event) -> bool {
+    use notify::EventKind;
+    matches!(
+        event.kind,
+        EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
+    ) && event
+        .paths
+        .iter()
+        .any(|p| p.file_name().is_some_and(|n| n == "config.json"))
+}
+
 /// 监控 config.json，外部变化时自动 reload 并通过回调通知（供 UI 刷新）。
+///
+/// 只对 `config.json` 自身的事件作出反应，过滤规则见 [`is_config_json_change`]：
+/// 回调方通常会重新应用设置（写配置/写日志），不过滤会自激。
 pub fn watch_config<F>(store: Arc<ConfigStore>, on_change: F) -> Result<()>
 where
     F: Fn() + Send + 'static,
 {
-    use notify::{EventKind, RecursiveMode, Watcher};
+    use notify::{RecursiveMode, Watcher};
     let dir = store.app_dir();
     let mut watcher = notify::recommended_watcher(
         move |res: std::result::Result<notify::Event, notify::Error>| {
             if let Ok(event) = res
-                && matches!(
-                    event.kind,
-                    EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
-                )
+                && is_config_json_change(&event)
             {
                 let _ = store.reload();
                 on_change();
@@ -439,4 +502,78 @@ where
     // 监听器必须保持存活，detach 到后台常驻。
     std::mem::forget(watcher);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    // 测试中 unwrap 直观且失败即测试失败，豁免。
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+    use notify::event::{CreateKind, ModifyKind, RemoveKind};
+    use notify::{Event, EventKind};
+    use std::path::PathBuf;
+
+    fn event(kind: EventKind, path: &str) -> Event {
+        Event {
+            kind,
+            paths: vec![PathBuf::from(path)],
+            attrs: Default::default(),
+        }
+    }
+
+    /// 生产事故防线：目录里除 config.json 外还有 logs/history.db 等高频写入文件，
+    /// 只有 config.json 自身的事件才允许触发 reload（否则日志写入会自激）。
+    #[test]
+    fn only_config_json_triggers_watch_callback() {
+        let dir = "/tmp/oxidict-app-dir";
+        assert!(is_config_json_change(&event(
+            EventKind::Modify(ModifyKind::Any),
+            &format!("{dir}/config.json")
+        )));
+        assert!(is_config_json_change(&event(
+            EventKind::Create(CreateKind::File),
+            &format!("{dir}/config.json")
+        )));
+        assert!(is_config_json_change(&event(
+            EventKind::Remove(RemoveKind::File),
+            &format!("{dir}/config.json")
+        )));
+        // 事件可能同时带多个路径（例如 rename 的源与目标），任一命中即可。
+        let mut rename = event(
+            EventKind::Modify(ModifyKind::Name(notify::event::RenameMode::Both)),
+            &format!("{dir}/config.json.tmp"),
+        );
+        rename
+            .paths
+            .push(PathBuf::from(format!("{dir}/config.json")));
+        assert!(is_config_json_change(&rename));
+
+        // 日志、历史库、锁文件、插件目录都不应触发。
+        for name in ["logs/oxidict.log", "history.db", "oxidict-app.lock"] {
+            assert!(
+                !is_config_json_change(&event(
+                    EventKind::Modify(ModifyKind::Any),
+                    &format!("{dir}/{name}")
+                )),
+                "{name} 不应触发 reload"
+            );
+        }
+        // 同名但带后缀的临时文件不触发（保存流程会先写 .tmp 再改名到
+        // config.json，只有最终落地的那次改名才应对应一次 reload）。
+        for name in ["config.json.tmp", "config.json.bak", "config.json.1"] {
+            assert!(
+                !is_config_json_change(&event(
+                    EventKind::Modify(ModifyKind::Any),
+                    &format!("{dir}/{name}")
+                )),
+                "{name} 不应触发 reload"
+            );
+        }
+        // 非写入类事件（如 Access）忽略。
+        assert!(!is_config_json_change(&event(
+            EventKind::Access(notify::event::AccessKind::Any),
+            &format!("{dir}/config.json")
+        )));
+    }
 }

@@ -7,7 +7,9 @@ use crate::Translator;
 use async_trait::async_trait;
 use oxidict_core::map_language;
 use oxidict_core::schema::ConfigField;
-use oxidict_core::{Error, HasConfig, Language, Result, TranslateRequest, TranslateResult};
+use oxidict_core::{
+    Error, HasConfig, Language, Result, TlsProfile, TranslateRequest, TranslateResult,
+};
 use serde_json::{Value, json};
 
 pub struct DeepL;
@@ -22,6 +24,7 @@ impl Translator for DeepL {
 
     fn config_schema(&self) -> Vec<ConfigField> {
         vec![
+            crate::tls_field(),
             ConfigField::Select {
                 key: "type",
                 label: "接口类型",
@@ -79,13 +82,13 @@ impl Translator for DeepL {
         match service_type.as_str() {
             "api" => {
                 let key = req.require_str("authKey", "DeepL Auth Key")?;
-                translate_by_key(&req.text, &from, &to, &key).await
+                translate_by_key(&req.text, &from, &to, &key, req.tls).await
             }
             "deeplx" => {
                 let url = req.require_str("customUrl", "DeepLX 地址")?;
-                translate_by_deeplx(&req.text, &from, &to, &url).await
+                translate_by_deeplx(&req.text, &from, &to, &url, req.tls).await
             }
-            _ => translate_by_free(&req.text, &from, &to).await,
+            _ => translate_by_free(&req.text, &from, &to, req.tls).await,
         }
     }
 }
@@ -106,7 +109,12 @@ fn get_time_stamp(i_count: usize) -> u64 {
     }
 }
 
-async fn translate_by_free(text: &str, from: &str, to: &str) -> Result<TranslateResult> {
+async fn translate_by_free(
+    text: &str,
+    from: &str,
+    to: &str,
+    tls: TlsProfile,
+) -> Result<TranslateResult> {
     use oxidict_net::NetErr as _;
 
     let rand = oxidict_net::alibaba_nonce();
@@ -140,7 +148,7 @@ async fn translate_by_free(text: &str, from: &str, to: &str) -> Result<Translate
         body_str = body_str.replace(r#""method":""#, r#""method": ""#);
     }
 
-    let resp = oxidict_net::client()
+    let resp = oxidict_net::client_for(tls)
         .post(JSONRPC_URL)
         .header("Content-Type", "application/json")
         .body(body_str)
@@ -163,13 +171,14 @@ async fn translate_by_deeplx(
     from: &str,
     to: &str,
     url: &str,
+    tls: TlsProfile,
 ) -> Result<TranslateResult> {
     let body = json!({
         "source_lang": from,
         "target_lang": to,
         "text": text,
     });
-    let result: Value = oxidict_net::post_json_value(url, &body).await?;
+    let result: Value = oxidict_net::post_json_value_for(tls, url, &body).await?;
     let translated = result
         .get("data")
         .and_then(|v| v.as_str())
@@ -178,7 +187,13 @@ async fn translate_by_deeplx(
     Ok(TranslateResult::Plain(translated))
 }
 
-async fn translate_by_key(text: &str, from: &str, to: &str, key: &str) -> Result<TranslateResult> {
+async fn translate_by_key(
+    text: &str,
+    from: &str,
+    to: &str,
+    key: &str,
+    tls: TlsProfile,
+) -> Result<TranslateResult> {
     use oxidict_net::NetErr as _;
 
     let url = if key.ends_with(":fx") {
@@ -198,7 +213,7 @@ async fn translate_by_key(text: &str, from: &str, to: &str, key: &str) -> Result
     }
 
     let auth = format!("DeepL-Auth-Key {}", key);
-    let resp = oxidict_net::post_with_headers(url, &[("Authorization", auth.as_str())])
+    let resp = oxidict_net::post_with_headers_for(tls, url, &[("Authorization", auth.as_str())])
         .json(&body)
         .send()
         .await

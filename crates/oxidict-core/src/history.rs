@@ -30,6 +30,11 @@ pub struct History {
 
 impl History {
     pub fn init(path: PathBuf) -> Result<Arc<Self>> {
+        // 与 ConfigStore 同构：全局单例只初始化一次，重复调用返回既有实例，
+        // 保证 `global()` 与本次返回值是同一个对象。
+        if let Some(existing) = DB.get() {
+            return Ok(existing.clone());
+        }
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }
@@ -38,11 +43,13 @@ impl History {
         let history = Arc::new(Self {
             conn: Mutex::new(conn),
         });
+        // 上面已确认 DB 为空，此处置入必然成功；`let _` 仅为兜底并发初始化。
         let _ = DB.set(history.clone());
         Ok(history)
     }
 
-    /// 默认位置：`<config_dir>/allen.town.focus.oxidict/history.db`
+    /// 默认位置：`<config_dir>/net.oxidict.app/history.db`（目录名见
+    /// [`crate::config::APP_ID`]）。
     pub fn init_default() -> Result<Arc<Self>> {
         let dir = dirs::config_dir()
             .ok_or_else(|| crate::error::Error::Config("无法定位系统配置目录".into()))?

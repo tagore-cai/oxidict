@@ -3,6 +3,8 @@
 //! 包含统一语言码表、配置存储、历史库、领域模型与错误类型。
 //! 这一层不依赖 GPUI，也不依赖 Tauri，可独立测试。
 
+use serde::{Deserialize, Serialize};
+
 pub mod backup;
 pub mod config;
 pub mod error;
@@ -70,8 +72,57 @@ impl ServiceKind {
     ];
 }
 
+/// HTTP 客户端指纹档位（写在服务实例配置的 `tls` 字段里）。
+///
+/// 默认 `Native`：不模拟浏览器，调官方 API 时足够。**网页端点**常被 WAF 按
+/// TLS（JA3/JA4）与 HTTP/2 特征判定，默认的非浏览器 ClientHello 会吃到 403
+/// 或连接重置，这时需要模拟真实浏览器。
+///
+/// 为什么放在 core 而不是网络层：请求结构体要携带它，而 `oxidict-net` 依赖
+/// core（反向不成立），放网络层会造成循环依赖或要求每个调用点自己传。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TlsProfile {
+    /// 原生指纹（不模拟浏览器）。
+    #[default]
+    Native,
+    /// 模拟 Chrome。
+    Chrome,
+    /// 模拟 Safari。
+    Safari,
+}
+
+impl TlsProfile {
+    /// 从配置值解析。**未知值一律回退 `Native`**：宁可指纹不匹配，
+    /// 也不要因为一个拼写错误就让所有请求"假装是 Safari"——那会把排查方向带偏。
+    pub fn from_code(code: &str) -> Self {
+        match code.trim().to_ascii_lowercase().as_str() {
+            "chrome" => Self::Chrome,
+            "safari" => Self::Safari,
+            _ => Self::Native,
+        }
+    }
+
+    /// 写回配置用的取值。
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Native => "native",
+            Self::Chrome => "chrome",
+            Self::Safari => "safari",
+        }
+    }
+
+    /// 是否模拟浏览器指纹。
+    pub fn is_emulated(self) -> bool {
+        !matches!(self, Self::Native)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    // 测试中 unwrap 直观且失败即测试失败，豁免。
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
 
     #[test]
@@ -111,5 +162,39 @@ mod tests {
         );
         // 多个 @ 时按第一个切分，后缀原样保留。
         assert_eq!(config::parse_instance("a@b@c"), ("a", Some("b@c")));
+    }
+
+    /// 指纹档位的解析必须**保守回退**：不认识的值（含空串、拼写错误、
+    /// 手改配置留下的历史值）一律当作「不模拟」。
+    #[test]
+    fn tls_profile_falls_back_to_native() {
+        assert_eq!(TlsProfile::from_code("chrome"), TlsProfile::Chrome);
+        assert_eq!(TlsProfile::from_code("  Chrome "), TlsProfile::Chrome);
+        assert_eq!(TlsProfile::from_code("SAFARI"), TlsProfile::Safari);
+        for unknown in ["", "native", "firefox", "Chrome131", "true", "1"] {
+            assert_eq!(
+                TlsProfile::from_code(unknown),
+                TlsProfile::Native,
+                "{unknown} 应回退 Native"
+            );
+        }
+    }
+
+    /// 取值与 serde 表示必须一致（配置里存的就是 `code()` 的字符串）。
+    #[test]
+    fn tls_profile_code_round_trips_through_json() {
+        for profile in [TlsProfile::Native, TlsProfile::Chrome, TlsProfile::Safari] {
+            let text = serde_json::to_string(&profile).unwrap();
+            assert_eq!(
+                text,
+                format!("\"{}\"", profile.code()),
+                "serde 表示与 code() 不一致"
+            );
+            let back: TlsProfile = serde_json::from_str(&text).unwrap();
+            assert_eq!(back, profile);
+        }
+        assert_eq!(TlsProfile::default(), TlsProfile::Native);
+        assert!(!TlsProfile::Native.is_emulated());
+        assert!(TlsProfile::Chrome.is_emulated());
     }
 }

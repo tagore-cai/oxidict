@@ -3,6 +3,7 @@
 //! 对应原 `src/window/Notify`：一个 always-on-top 的小窗，显示一条消息，
 //! 3 秒后自动关闭，也可手动点关闭按钮立即关闭。
 
+use crate::tokens::Text;
 use gpui_kit::AppContext as _;
 use gpui_kit::base::{h_flex, v_flex};
 use gpui_kit::component::Root;
@@ -43,7 +44,7 @@ impl Render for NotifyWindow {
                     .justify_between()
                     .child(
                         div()
-                            .text_size(px(13.))
+                            .text_size(Text::Label.size())
                             .font_weight(FontWeight::MEDIUM)
                             .child(SharedString::from(t("app-name"))),
                     )
@@ -61,7 +62,7 @@ impl Render for NotifyWindow {
                 div()
                     .flex_1()
                     .min_h_0()
-                    .text_size(px(12.))
+                    .text_size(Text::Body.size())
                     .text_color(theme.colors.foreground)
                     .child(SharedString::from(self.message.clone())),
             )

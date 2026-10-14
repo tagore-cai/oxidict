@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Oxidict 领域内核：统一语言码表、config.json 存储、sqlite 历史库、领域模型与声明式配置表单"
 
 [dependencies]
 fluent-templates.workspace = true

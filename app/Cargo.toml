@@ -4,10 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "可执行入口：启动编排、日志、单实例锁与 CLI（内核模式 + GPUI 主窗口）"
 
 [dependencies]
 oxidict-core.workspace = true
-oxidict-net.workspace = true
 oxidict-platform.workspace = true
 oxidict-services.workspace = true
 oxidict-plugin.workspace = true

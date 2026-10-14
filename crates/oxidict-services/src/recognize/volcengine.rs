@@ -61,11 +61,11 @@ impl Recognizer for Volcengine {
 
         let data = value
             .get("data")
-            .ok_or_else(|| Error::Service(serde_json::to_string(&value).unwrap_or_default()))?;
+            .ok_or_else(|| Error::Service(describe_response(&value)))?;
         let line_texts = data
             .get("line_texts")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| Error::Service(serde_json::to_string(&value).unwrap_or_default()))?;
+            .ok_or_else(|| Error::Service(describe_response(&value)))?;
 
         let mut texts = String::new();
         for t in line_texts {
@@ -76,6 +76,14 @@ impl Recognizer for Volcengine {
         }
         Ok(texts.trim().to_string())
     }
+}
+
+/// 响应缺少预期字段时的错误描述。
+///
+/// 直接用 `unwrap_or_default()` 会在序列化失败时把错误信息变成空串，
+/// 排查时看不到任何线索；这里给出明确的兜底文案。
+fn describe_response(value: &Value) -> String {
+    serde_json::to_string(value).unwrap_or_else(|e| format!("<响应序列化失败: {e}>"))
 }
 
 /// 火山 OCR 的签名与请求发送；`action`/`version` 区分普通与多语种接口。
